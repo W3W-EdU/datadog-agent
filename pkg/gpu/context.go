@@ -12,6 +12,7 @@ import (
 
 	"github.com/NVIDIA/go-nvml/pkg/nvml"
 
+	"github.com/DataDog/datadog-agent/pkg/gpu/cuda"
 	"github.com/DataDog/datadog-agent/pkg/util/ktime"
 )
 
@@ -25,12 +26,24 @@ type systemContext struct {
 
 	// nvmlLib is the NVML library used to query GPU devices
 	nvmlLib nvml.Interface
+
+	// selectedDeviceByPID maps each process ID to the device index it has selected
+	// note that this is the device index as seen by the process itself, which might
+	// be modified by the CUDA_VISIBLE_DEVICES environment variable later
+	selectedDeviceByPID map[int]int
+
+	// gpuDevices is the list of GPU devices on the system
+	gpuDevices []nvml.Device
+
+	// procRoot is the path to the procfs root
+	procRoot string
 }
 
-func getSystemContext(nvmlLib nvml.Interface) (*systemContext, error) {
+func getSystemContext(nvmlLib nvml.Interface, procRoot string) (*systemContext, error) {
 	ctx := &systemContext{
 		maxGpuThreadsPerDevice: make(map[int]int),
 		nvmlLib:                nvmlLib,
+		procRoot:               procRoot,
 	}
 
 	if err := ctx.queryDevices(); err != nil {
@@ -47,12 +60,13 @@ func getSystemContext(nvmlLib nvml.Interface) (*systemContext, error) {
 }
 
 func (ctx *systemContext) queryDevices() error {
-	devices, err := getGPUDevices(ctx.nvmlLib)
+	var err error
+	ctx.gpuDevices, err = getGPUDevices(ctx.nvmlLib)
 	if err != nil {
 		return fmt.Errorf("error getting GPU devices: %w", err)
 	}
 
-	for i, device := range devices {
+	for i, device := range ctx.gpuDevices {
 		maxThreads, err := getMaxThreadsForDevice(device)
 		if err != nil {
 			return fmt.Errorf("error getting max threads for device %s: %w", device, err)
@@ -62,4 +76,22 @@ func (ctx *systemContext) queryDevices() error {
 	}
 
 	return nil
+}
+
+func (ctx *systemContext) getCurrentActiveGpuDevice(pid int) (*nvml.Device, error) {
+	visibleDevices, err := cuda.GetVisibleDevicesForProcess(ctx.gpuDevices, pid, ctx.procRoot)
+	if err != nil {
+		return nil, fmt.Errorf("error getting visible devices for process %d: %w", pid, err)
+	}
+
+	if len(visibleDevices) == 0 {
+		return nil, fmt.Errorf("no GPU devices for process %d", pid)
+	}
+
+	selectedDeviceIndex := ctx.selectedDeviceByPID[pid] // Defaults to 0, which is the same as CUDA
+	if selectedDeviceIndex < 0 || selectedDeviceIndex >= len(visibleDevices) {
+		return nil, fmt.Errorf("device index %d is out of range", selectedDeviceIndex)
+	}
+
+	return &visibleDevices[selectedDeviceIndex], nil
 }

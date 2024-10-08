@@ -164,7 +164,7 @@ func startGPUProbe(buf bytecode.AssetReader, opts manager.Options, deps ProbeDep
 		deps:     deps,
 	}
 
-	sysCtx, err := getSystemContext(deps.NvmlLib)
+	sysCtx, err := getSystemContext(deps.NvmlLib, cfg.ProcRoot)
 	if err != nil {
 		return nil, fmt.Errorf("error getting system context: %w", err)
 	}
