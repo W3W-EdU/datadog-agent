@@ -53,7 +53,15 @@ func InspectNewProcessBinary(elfFile *elf.File, functions map[string]FunctionCon
 	// This might fail if the binary was stripped.
 	symbols, err := GetAllSymbolsInSetByName(elfFile, symbolsSet)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, elf.ErrNoSymbols) {
+			var innerError error
+			symbols, innerError = GetPCLNTABSymbolParser(elfFile, newStringSetSymbolFilter(symbolsSet))
+			if innerError != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
 	}
 
 	inspector := newProcessBinaryInspector{
