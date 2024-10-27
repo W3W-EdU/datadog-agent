@@ -128,7 +128,7 @@ func (r *FileRegistry) Unblock(namespacedPath string, pid uint32) {
 	defer r.m.Unlock()
 	path, err := NewFilePath(r.procRoot, namespacedPath, pid)
 	if r.blocklistByID != nil && err == nil {
-		r.blocklistByID.Remove(path)
+		r.blocklistByID.Remove(path.ID)
 	}
 }
 
