@@ -122,6 +122,16 @@ var (
 	ErrPathIsAlreadyRegistered = errors.New("path is already registered")
 )
 
+// Unblock removes a path from the blocklist so it can be registered again
+func (r *FileRegistry) Unblock(namespacedPath string, pid uint32) {
+	r.m.Lock()
+	defer r.m.Unlock()
+	path, err := NewFilePath(r.procRoot, namespacedPath, pid)
+	if r.blocklistByID != nil && err == nil {
+		r.blocklistByID.Remove(path)
+	}
+}
+
 // Register inserts or updates a new file registration within to the `FileRegistry`;
 //
 // If no current registration exists for the given `PathIdentifier`, we execute
