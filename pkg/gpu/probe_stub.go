@@ -14,6 +14,7 @@ import (
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/gpu/model"
 	"github.com/DataDog/datadog-agent/pkg/ebpf"
+	"github.com/DataDog/datadog-agent/pkg/gpu/config"
 )
 
 // ProbeDependencies holds the dependencies for the probe
@@ -27,7 +28,7 @@ type ProbeDependencies struct {
 type Probe struct{}
 
 // NewProbe is not implemented on non-linux systems
-func NewProbe(_ *Config, _ ProbeDependencies) (*Probe, error) {
+func NewProbe(_ *config.Config, _ ProbeDependencies) (*Probe, error) {
 	return nil, ebpf.ErrNotImplemented
 }
 
