@@ -209,6 +209,11 @@ const (
 	DockerEnvironment = "docker"
 )
 
+const (
+	getEventTimeout                 = 10 * time.Second
+	filelessExecutionFilenamePrefix = "memfd:"
+)
+
 type testModule struct {
 	sync.RWMutex
 	secconfig     *secconfig.Config
