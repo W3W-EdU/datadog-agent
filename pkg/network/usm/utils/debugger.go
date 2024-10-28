@@ -11,7 +11,10 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/DataDog/datadog-agent/pkg/util/kernel"
 	"net/http"
+	"path/filepath"
+	"strconv"
 	"sync"
 
 	otherutils "github.com/DataDog/datadog-agent/cmd/system-probe/utils"
@@ -58,6 +61,46 @@ func TracedProgramsEndpoint(w http.ResponseWriter, _ *http.Request) {
 // This is used for debugging purposes only.
 func BlockedPathIDEndpoint(w http.ResponseWriter, _ *http.Request) {
 	otherutils.WriteAsJSON(w, debugger.GetAllBlockedPathIDs())
+}
+
+// UnblockEndpoint all blocked paths for the specified program type.
+func UnblockEndpoint(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprintf(w, "Only POST requests are allowed")
+		return
+	}
+
+	var reqBody attachRequestBody
+	err := json.NewDecoder(r.Body).Decode(&reqBody)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Error decoding request body: %v", err)
+		return
+	}
+
+	if reqBody.Type == "" || reqBody.PID == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Invalid request body: %v", reqBody)
+		return
+	}
+	debugger.mux.Lock()
+	defer debugger.mux.Unlock()
+	for _, registry := range debugger.registries {
+		if registry.telemetry.programName == reqBody.Type {
+			exePath := filepath.Join(kernel.ProcFSRoot(), strconv.Itoa(int(reqBody.PID)), "exe")
+
+			binPath, err := ResolveSymlink(exePath)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, "Error resolving symlink: %v", err)
+				return
+			}
+
+			registry.Unblock(binPath, uint32(reqBody.PID))
+			return
+		}
+	}
 }
 
 var debugger *tlsDebugger
