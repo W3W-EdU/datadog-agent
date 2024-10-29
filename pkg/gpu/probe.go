@@ -88,7 +88,7 @@ func NewProbe(cfg *config.Config, deps ProbeDependencies) (*Probe, error) {
 		}
 	}
 
-	probe, err := startGPUProbe(m, deps, cfg)
+	probe, err := start(m, deps, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,9 @@ func getManager(buf io.ReaderAt, opts manager.Options) (*manager.Manager, error)
 	return m.Manager, nil
 }
 
-func startGPUProbe(m *manager.Manager, deps ProbeDependencies, cfg *config.Config) (*Probe, error) {
+// TODO: in the future consider replacing that with a proper state management via public Init and Start methods.
+// for now we can keep this for simplicity
+func start(m *manager.Manager, deps ProbeDependencies, cfg *config.Config) (*Probe, error) {
 
 	// Note: this will later be replaced by a common way to enable the process monitor across system-probe
 	procMon := monitor.GetProcessMonitor()
