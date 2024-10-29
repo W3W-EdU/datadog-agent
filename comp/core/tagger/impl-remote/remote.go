@@ -3,8 +3,8 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-// Package remote implements a remote Tagger.
-package remote
+// Package taggerimpl implements a remote Tagger.
+package taggerimpl
 
 import (
 	"context"
@@ -23,17 +23,19 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/DataDog/datadog-agent/comp/core/config"
-	"github.com/DataDog/datadog-agent/comp/core/tagger"
+	log "github.com/DataDog/datadog-agent/comp/core/log/def"
 	taggercommon "github.com/DataDog/datadog-agent/comp/core/tagger/common"
+	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/empty"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
+	coretelemetry "github.com/DataDog/datadog-agent/comp/core/telemetry"
+	compdef "github.com/DataDog/datadog-agent/comp/def"
 	"github.com/DataDog/datadog-agent/pkg/api/security"
 	pb "github.com/DataDog/datadog-agent/pkg/proto/pbgo/core"
 	"github.com/DataDog/datadog-agent/pkg/tagset"
 	"github.com/DataDog/datadog-agent/pkg/util/clusteragent"
 	grpcutil "github.com/DataDog/datadog-agent/pkg/util/grpc"
-	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 const (
@@ -43,9 +45,23 @@ const (
 
 var errTaggerStreamNotStarted = errors.New("tagger stream not started")
 
-// Tagger holds a connection to a remote tagger, processes incoming events from
-// it, and manages the storage of entities to allow querying.
-type Tagger struct {
+type Requires struct {
+	compdef.In
+
+	Lc        compdef.Lifecycle
+	Config    config.Component
+	Log       log.Component
+	Params    tagger.Params
+	Telemetry coretelemetry.Component
+}
+
+type Provides struct {
+	compdef.Out
+
+	Comp tagger.Component
+}
+
+type remoteTagger struct {
 	store   *tagStore
 	ready   bool
 	options Options
@@ -113,21 +129,44 @@ func CLCRunnerOptions(config config.Component) (Options, error) {
 	return opts, nil
 }
 
-// NewTagger returns an allocated tagger. You still have to run Init()
-// once the config package is ready.
-func NewTagger(options Options, cfg config.Component, telemetryStore *telemetry.Store, filter *types.Filter) *Tagger {
-	return &Tagger{
-		options:        options,
-		cfg:            cfg,
-		store:          newTagStore(cfg, telemetryStore),
-		telemetryStore: telemetryStore,
-		filter:         filter,
-	}
+// NewComponent returns a remote tagger
+func NewComponent(req Requires) (Provides, error) {
+	telemetryStore := telemetry.NewStore(req.Telemetry)
+
+	// var err error
+	var options Options
+	// switch deps.Params.AgentTypeForTagger {
+	// case taggerComp.CLCRunnerRemoteTaggerAgent:
+	// 	options, err = remote.CLCRunnerOptions(deps.Config)
+
+	// 	if err != nil {
+	// 		deps.Log.Errorf("unable to deps.Configure the remote tagger: %s", err)
+	// 		taggerClient = createTaggerClient(local.NewFakeTagger(deps.Config, telemetryStore), deps.Log)
+	// 	} else if options.Disabled {
+	// 		deps.Log.Errorf("remote tagger is disabled in clc runner.")
+	// 		taggerClient = createTaggerClient(local.NewFakeTagger(deps.Config, telemetryStore), deps.Log)
+	// 	} else {
+	// 		filter := types.NewFilterBuilder().Exclude(types.KubernetesPodUID).Build(types.HighCardinality)
+	// 		taggerClient = createTaggerClient(remote.NewTagger(options, deps.Config, telemetryStore, filter), deps.Log)
+	// 	}
+	// case taggerComp.NodeRemoteTaggerAgent:
+	// 	options, err := remote.NodeAgentOptions(deps.Config)
+	// 	taggerClient = createTaggerClient(remote.NewTagger(options, deps.Config, telemetryStore, types.NewMatchAllFilter()), deps.Log)
+
+	return Provides{
+		Comp: &remoteTagger{
+			options:        options,
+			cfg:            req.Config,
+			store:          newTagStore(req.Config, telemetryStore),
+			telemetryStore: telemetryStore,
+			filter:         req.Params.RemoteFilter,
+		},
+	}, nil
 }
 
 // Start creates the connection to the remote tagger and starts watching for
 // events.
-func (t *Tagger) Start(ctx context.Context) error {
+func (t *remoteTagger) Start(ctx context.Context) error {
 	t.telemetryTicker = time.NewTicker(1 * time.Minute)
 
 	t.ctx, t.cancel = context.WithCancel(ctx)
@@ -174,7 +213,7 @@ func (t *Tagger) Start(ctx context.Context) error {
 }
 
 // Stop closes the connection to the remote tagger and stops event collection.
-func (t *Tagger) Stop() error {
+func (t *remoteTagger) Stop() error {
 	t.cancel()
 
 	err := t.conn.Close()
@@ -191,17 +230,17 @@ func (t *Tagger) Stop() error {
 
 // ReplayTagger returns the replay tagger instance
 // This is a no-op for the remote tagger
-func (t *Tagger) ReplayTagger() tagger.ReplayTagger {
+func (t *remoteTagger) ReplayTagger() tagger.ReplayTagger {
 	return nil
 }
 
 // GetTaggerTelemetryStore returns tagger telemetry store
-func (t *Tagger) GetTaggerTelemetryStore() *telemetry.Store {
+func (t *remoteTagger) GetTaggerTelemetryStore() *telemetry.Store {
 	return t.telemetryStore
 }
 
 // Tag returns tags for a given entity at the desired cardinality.
-func (t *Tagger) Tag(entityID types.EntityID, cardinality types.TagCardinality) ([]string, error) {
+func (t *remoteTagger) Tag(entityID types.EntityID, cardinality types.TagCardinality) ([]string, error) {
 	entity := t.store.getEntity(entityID)
 	if entity != nil {
 		t.telemetryStore.QueriesByCardinality(cardinality).Success.Inc()
@@ -217,7 +256,7 @@ func (t *Tagger) Tag(entityID types.EntityID, cardinality types.TagCardinality) 
 // If possible, avoid using this function, and use the Tag method instead.
 // This function exists in order not to break backward compatibility with rtloader and python
 // integrations using the tagger
-func (t *Tagger) LegacyTag(entity string, cardinality types.TagCardinality) ([]string, error) {
+func (t *remoteTagger) LegacyTag(entity string, cardinality types.TagCardinality) ([]string, error) {
 	prefix, id, err := taggercommon.ExtractPrefixAndID(entity)
 	if err != nil {
 		return nil, err
@@ -228,7 +267,7 @@ func (t *Tagger) LegacyTag(entity string, cardinality types.TagCardinality) ([]s
 }
 
 // AccumulateTagsFor returns tags for a given entity at the desired cardinality.
-func (t *Tagger) AccumulateTagsFor(entityID types.EntityID, cardinality types.TagCardinality, tb tagset.TagsAccumulator) error {
+func (t *remoteTagger) AccumulateTagsFor(entityID types.EntityID, cardinality types.TagCardinality, tb tagset.TagsAccumulator) error {
 	tags, err := t.Tag(entityID, cardinality)
 	if err != nil {
 		return err
@@ -238,7 +277,7 @@ func (t *Tagger) AccumulateTagsFor(entityID types.EntityID, cardinality types.Ta
 }
 
 // Standard returns the standard tags for a given entity.
-func (t *Tagger) Standard(entityID types.EntityID) ([]string, error) {
+func (t *remoteTagger) Standard(entityID types.EntityID) ([]string, error) {
 	entity := t.store.getEntity(entityID)
 	if entity == nil {
 		return []string{}, nil
@@ -248,7 +287,7 @@ func (t *Tagger) Standard(entityID types.EntityID) ([]string, error) {
 }
 
 // GetEntity returns the entity corresponding to the specified id and an error
-func (t *Tagger) GetEntity(entityID types.EntityID) (*types.Entity, error) {
+func (t *remoteTagger) GetEntity(entityID types.EntityID) (*types.Entity, error) {
 	entity := t.store.getEntity(entityID)
 	if entity == nil {
 		return nil, fmt.Errorf("Entity not found for entityID")
@@ -258,7 +297,7 @@ func (t *Tagger) GetEntity(entityID types.EntityID) (*types.Entity, error) {
 }
 
 // List returns all the entities currently stored by the tagger.
-func (t *Tagger) List() types.TaggerListResponse {
+func (t *remoteTagger) List() types.TaggerListResponse {
 	entities := t.store.listEntities()
 	resp := types.TaggerListResponse{
 		Entities: make(map[string]types.TaggerListEntity),
@@ -278,11 +317,11 @@ func (t *Tagger) List() types.TaggerListResponse {
 // Subscribe returns a channel that receives a slice of events whenever an entity is
 // added, modified or deleted. It can send an initial burst of events only to the new
 // subscriber, without notifying all of the others.
-func (t *Tagger) Subscribe(subscriptionID string, filter *types.Filter) (types.Subscription, error) {
+func (t *remoteTagger) Subscribe(subscriptionID string, filter *types.Filter) (types.Subscription, error) {
 	return t.store.subscribe(subscriptionID, filter)
 }
 
-func (t *Tagger) run() {
+func (t *remoteTagger) run() {
 	for {
 		select {
 		case <-t.telemetryTicker.C:
@@ -334,7 +373,7 @@ func (t *Tagger) run() {
 	}
 }
 
-func (t *Tagger) processResponse(response *pb.StreamTagsResponse) error {
+func (t *remoteTagger) processResponse(response *pb.StreamTagsResponse) error {
 	// returning early when there are no events prevents a keep-alive sent
 	// from the core agent from wiping the store clean in case the remote
 	// tagger was previously in an unready (but filled) state.
@@ -382,7 +421,7 @@ func (t *Tagger) processResponse(response *pb.StreamTagsResponse) error {
 // Since the entire remote tagger really depends on this working, it'll keep on
 // retrying with an exponential backoff until maxElapsed (or forever if
 // maxElapsed == 0) or the tagger is stopped.
-func (t *Tagger) startTaggerStream(maxElapsed time.Duration) error {
+func (t *remoteTagger) startTaggerStream(maxElapsed time.Duration) error {
 	expBackoff := backoff.NewExponentialBackOff()
 	expBackoff.InitialInterval = 500 * time.Millisecond
 	expBackoff.MaxInterval = 5 * time.Minute

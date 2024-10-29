@@ -3,8 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-// Package replay implements the Tagger replay.
-package replay
+package taggerimpl
 
 import (
 	"context"
@@ -12,8 +11,8 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-agent/comp/core/config"
-	"github.com/DataDog/datadog-agent/comp/core/tagger"
 	taggercommon "github.com/DataDog/datadog-agent/comp/core/tagger/common"
+	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/empty"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/tagstore"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
@@ -22,8 +21,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
-// Tagger stores tags to entity as stored in a replay state.
-type Tagger struct {
+type replayTagger struct {
 	store *tagstore.TagStore
 
 	ctx    context.Context
@@ -34,10 +32,8 @@ type Tagger struct {
 	empty.Tagger
 }
 
-// NewTagger returns an allocated tagger. You still have to run Init()
-// once the config package is ready.
-func NewTagger(cfg config.Component, telemetryStore *telemetry.Store) *Tagger {
-	return &Tagger{
+func newReplayTagger(cfg config.Component, telemetryStore *telemetry.Store) *replayTagger {
+	return &replayTagger{
 		store:          tagstore.NewTagStore(cfg, telemetryStore),
 		telemetryStore: telemetryStore,
 	}
@@ -45,7 +41,7 @@ func NewTagger(cfg config.Component, telemetryStore *telemetry.Store) *Tagger {
 
 // Start starts the connection to the replay tagger and starts watching for
 // events.
-func (t *Tagger) Start(ctx context.Context) error {
+func (t *replayTagger) Start(ctx context.Context) error {
 	t.telemetryTicker = time.NewTicker(1 * time.Minute)
 
 	t.ctx, t.cancel = context.WithCancel(ctx)
@@ -54,7 +50,7 @@ func (t *Tagger) Start(ctx context.Context) error {
 }
 
 // Stop closes the connection to the replay tagger and stops event collection.
-func (t *Tagger) Stop() error {
+func (t *replayTagger) Stop() error {
 	t.cancel()
 
 	t.telemetryTicker.Stop()
@@ -65,7 +61,7 @@ func (t *Tagger) Stop() error {
 }
 
 // Tag returns tags for a given entity at the desired cardinality.
-func (t *Tagger) Tag(entityID types.EntityID, cardinality types.TagCardinality) ([]string, error) {
+func (t *replayTagger) Tag(entityID types.EntityID, cardinality types.TagCardinality) ([]string, error) {
 	tags := t.store.Lookup(entityID, cardinality)
 	return tags, nil
 }
@@ -74,7 +70,7 @@ func (t *Tagger) Tag(entityID types.EntityID, cardinality types.TagCardinality) 
 // If possible, avoid using this function, and use the Tag method instead.
 // This function exists in order not to break backward compatibility with rtloader and python
 // integrations using the tagger
-func (t *Tagger) LegacyTag(entity string, cardinality types.TagCardinality) ([]string, error) {
+func (t *replayTagger) LegacyTag(entity string, cardinality types.TagCardinality) ([]string, error) {
 	prefix, id, err := taggercommon.ExtractPrefixAndID(entity)
 	if err != nil {
 		return nil, err
@@ -85,7 +81,7 @@ func (t *Tagger) LegacyTag(entity string, cardinality types.TagCardinality) ([]s
 }
 
 // AccumulateTagsFor returns tags for a given entity at the desired cardinality.
-func (t *Tagger) AccumulateTagsFor(entityID types.EntityID, cardinality types.TagCardinality, tb tagset.TagsAccumulator) error {
+func (t *replayTagger) AccumulateTagsFor(entityID types.EntityID, cardinality types.TagCardinality, tb tagset.TagsAccumulator) error {
 	tags := t.store.LookupHashed(entityID, cardinality)
 
 	if tags.Len() == 0 {
@@ -100,7 +96,7 @@ func (t *Tagger) AccumulateTagsFor(entityID types.EntityID, cardinality types.Ta
 }
 
 // Standard returns the standard tags for a given entity.
-func (t *Tagger) Standard(entityID types.EntityID) ([]string, error) {
+func (t *replayTagger) Standard(entityID types.EntityID) ([]string, error) {
 	tags, err := t.store.LookupStandard(entityID)
 	if err != nil {
 		return []string{}, err
@@ -110,28 +106,28 @@ func (t *Tagger) Standard(entityID types.EntityID) ([]string, error) {
 }
 
 // List returns all the entities currently stored by the tagger.
-func (t *Tagger) List() types.TaggerListResponse {
+func (t *replayTagger) List() types.TaggerListResponse {
 	return t.store.List()
 }
 
 // Subscribe does nothing in the replay tagger this tagger does not respond to events.
-func (t *Tagger) Subscribe(_ string, _ *types.Filter) (types.Subscription, error) {
+func (t *replayTagger) Subscribe(_ string, _ *types.Filter) (types.Subscription, error) {
 	// NOP
 	return nil, fmt.Errorf("not implemented")
 }
 
 // ReplayTagger returns the replay tagger instance
-func (t *Tagger) ReplayTagger() tagger.ReplayTagger {
-	return t
+func (t *replayTagger) ReplayTagger() tagger.ReplayTagger {
+	return nil
 }
 
 // GetTaggerTelemetryStore returns tagger telemetry store
-func (t *Tagger) GetTaggerTelemetryStore() *telemetry.Store {
+func (t *replayTagger) GetTaggerTelemetryStore() *telemetry.Store {
 	return t.telemetryStore
 }
 
 // LoadState loads the state for the tagger from the supplied map.
-func (t *Tagger) LoadState(state []types.Entity) {
+func (t *replayTagger) LoadState(state []types.Entity) {
 	if state == nil {
 		return
 	}
@@ -152,6 +148,6 @@ func (t *Tagger) LoadState(state []types.Entity) {
 }
 
 // GetEntity returns the entity corresponding to the specified id and an error
-func (t *Tagger) GetEntity(entityID types.EntityID) (*types.Entity, error) {
+func (t *replayTagger) GetEntity(entityID types.EntityID) (*types.Entity, error) {
 	return t.store.GetEntity(entityID)
 }

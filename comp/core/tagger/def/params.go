@@ -7,6 +7,7 @@ package tagger
 
 import (
 	"github.com/DataDog/datadog-agent/comp/core/config"
+	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	pkgconfigsetup "github.com/DataDog/datadog-agent/pkg/config/setup"
 )
 
@@ -25,6 +26,7 @@ const (
 type Params struct {
 	AgentTypeForTagger                 AgentTypeForTagger
 	FallBackToLocalIfRemoteTaggerFails bool
+	RemoteFilter                       *types.Filter
 }
 
 // NewTaggerParamsForCoreAgent is a constructor function for creating core agent tagger params

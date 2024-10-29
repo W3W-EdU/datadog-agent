@@ -21,7 +21,7 @@ import (
 
 	workloadmetaServer "github.com/DataDog/datadog-agent/comp/core/workloadmeta/server"
 
-	"github.com/DataDog/datadog-agent/comp/core/tagger"
+	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
 	taggerProto "github.com/DataDog/datadog-agent/comp/core/tagger/proto"
 	taggerserver "github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/server"
 	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
