@@ -9,11 +9,14 @@ package gpu
 
 import (
 	"fmt"
-	sysconfig "github.com/DataDog/datadog-agent/cmd/system-probe/config"
 	"io"
 	"os"
 	"regexp"
 
+	"github.com/NVIDIA/go-nvml/pkg/nvml"
+	"github.com/cilium/ebpf"
+
+	sysconfig "github.com/DataDog/datadog-agent/cmd/system-probe/config"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry"
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/gpu/model"
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
@@ -23,8 +26,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/process/monitor"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	manager "github.com/DataDog/ebpf-manager"
-	"github.com/NVIDIA/go-nvml/pkg/nvml"
-	"github.com/cilium/ebpf"
 )
 
 const (
