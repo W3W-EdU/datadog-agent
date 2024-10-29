@@ -14,11 +14,6 @@ import (
 	"os"
 	"regexp"
 
-	manager "github.com/DataDog/ebpf-manager"
-	"github.com/NVIDIA/go-nvml/pkg/nvml"
-	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/rlimit"
-
 	"github.com/DataDog/datadog-agent/comp/core/telemetry"
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/gpu/model"
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
@@ -27,6 +22,9 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/gpu/config"
 	"github.com/DataDog/datadog-agent/pkg/process/monitor"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
+	manager "github.com/DataDog/ebpf-manager"
+	"github.com/NVIDIA/go-nvml/pkg/nvml"
+	"github.com/cilium/ebpf"
 )
 
 const (
@@ -194,10 +192,6 @@ func startGPUProbe(m *manager.Manager, deps ProbeDependencies, cfg *config.Confi
 	attacher, err := uprobes.NewUprobeAttacher(gpuAttacherName, attachCfg, m, nil, &uprobes.NativeBinaryInspector{})
 	if err != nil {
 		return nil, fmt.Errorf("error creating uprobes attacher: %w", err)
-	}
-
-	if err := rlimit.RemoveMemlock(); err != nil {
-		return nil, err
 	}
 
 	p := &Probe{
