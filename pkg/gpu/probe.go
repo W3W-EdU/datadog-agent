@@ -9,6 +9,8 @@ package gpu
 
 import (
 	"fmt"
+	sysconfig "github.com/DataDog/datadog-agent/cmd/system-probe/config"
+	"io"
 	"os"
 	"regexp"
 
@@ -46,7 +48,7 @@ type ProbeDependencies struct {
 
 // Probe represents the GPU monitoring probe
 type Probe struct {
-	mgr            *ddebpf.Manager
+	m              *manager.Manager
 	cfg            *config.Config
 	consumer       *cudaEventConsumer
 	attacher       *uprobes.UprobeAttacher
@@ -58,34 +60,75 @@ type Probe struct {
 // consumers for the events generated from the uprobes, and the stats generator to aggregate the data from
 // streams into per-process GPU stats.
 func NewProbe(cfg *config.Config, deps ProbeDependencies) (*Probe, error) {
-	log.Debugf("starting GPU monitoring probe...")
 	if err := config.CheckGPUSupported(); err != nil {
 		return nil, err
 	}
+	log.Tracef("starting %s probe...", sysconfig.GPUMonitoringModule)
 
-	var probe *Probe
-	filename := "gpu.o"
-	if cfg.BPFDebug {
-		filename = "gpu-debug.o"
-	}
-	err := ddebpf.LoadCOREAsset(filename, func(buf bytecode.AssetReader, opts manager.Options) error {
-		var err error
-		probe, err = startGPUProbe(buf, opts, deps, cfg)
+	allowRC := cfg.EnableRuntimeCompiler && cfg.AllowRuntimeCompiledFallback
+	var m *manager.Manager
+	var err error
+
+	//try CO-RE first
+	if cfg.EnableCORE {
+		m, err = getCOREGPU(cfg)
+
 		if err != nil {
-			return fmt.Errorf("cannot start GPU monitoring probe: %s", err)
+			if allowRC {
+				log.Warnf("error loading CO-RE %s, falling back to runtime compiled: %v", sysconfig.GPUMonitoringModule, err)
+			} else {
+				return nil, fmt.Errorf("error loading CO-RE %s: %w", sysconfig.GPUMonitoringModule, err)
+			}
 		}
-		log.Debugf("started GPU monitoring probe")
-		return nil
-	})
+	}
+
+	//if manager is not initialized yet and RC is enabled, try runtime compilation
+	if m == nil && allowRC {
+		m, err = getRCGPU(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("unable to compile %s probe: %w", sysconfig.GPUMonitoringModule, err)
+		}
+	}
+
+	probe, err := startGPUProbe(m, deps, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("loading asset: %s", err)
+		return nil, err
 	}
 
 	return probe, nil
 }
 
-func startGPUProbe(buf bytecode.AssetReader, opts manager.Options, deps ProbeDependencies, cfg *config.Config) (*Probe, error) {
-	mgr := ddebpf.NewManagerWithDefault(&manager.Manager{
+func getRCGPU(cfg *config.Config) (*manager.Manager, error) {
+	buf, err := getRuntimeCompiledGPUMonitoring(cfg)
+	if err != nil {
+		return nil, err
+	}
+	defer buf.Close()
+
+	return getManager(buf, manager.Options{})
+}
+
+func getCOREGPU(cfg *config.Config) (*manager.Manager, error) {
+	asset := getAssetName("gpu", cfg.BPFDebug)
+	var m *manager.Manager
+	var err error
+	err = ddebpf.LoadCOREAsset(asset, func(ar bytecode.AssetReader, o manager.Options) error {
+		m, err = getManager(ar, o)
+		return err
+	})
+	return m, err
+}
+
+func getAssetName(module string, debug bool) string {
+	if debug {
+		return fmt.Sprintf("%s-debug.o", module)
+	}
+
+	return fmt.Sprintf("%s.o", module)
+}
+
+func getManager(buf io.ReaderAt, opts manager.Options) (*manager.Manager, error) {
+	m := ddebpf.NewManagerWithDefault(&manager.Manager{
 		Maps: []*manager.Map{
 			{Name: cudaAllocCacheMap},
 		}})
@@ -108,6 +151,21 @@ func startGPUProbe(buf bytecode.AssetReader, opts manager.Options, deps ProbeDep
 		KeySize:    0,
 		ValueSize:  0,
 		EditorFlag: manager.EditType | manager.EditMaxEntries | manager.EditKeyValue,
+	}
+
+	if err := m.InitWithOptions(buf, &opts); err != nil {
+		return nil, fmt.Errorf("failed to init manager: %w", err)
+	}
+
+	return m.Manager, nil
+}
+
+func startGPUProbe(m *manager.Manager, deps ProbeDependencies, cfg *config.Config) (*Probe, error) {
+
+	// Note: this will later be replaced by a common way to enable the process monitor across system-probe
+	procMon := monitor.GetProcessMonitor()
+	if err := procMon.Initialize(false); err != nil {
+		return nil, fmt.Errorf("error initializing process monitor: %w", err)
 	}
 
 	attachCfg := uprobes.AttacherConfig{
@@ -133,13 +191,7 @@ func startGPUProbe(buf bytecode.AssetReader, opts manager.Options, deps ProbeDep
 		PerformInitialScan: cfg.InitialProcessSync,
 	}
 
-	// Note: this will later be replaced by a common way to enable the process monitor across system-probe
-	procMon := monitor.GetProcessMonitor()
-	if err := procMon.Initialize(false); err != nil {
-		return nil, fmt.Errorf("error initializing process monitor: %w", err)
-	}
-
-	attacher, err := uprobes.NewUprobeAttacher(gpuAttacherName, attachCfg, mgr, nil, &uprobes.NativeBinaryInspector{})
+	attacher, err := uprobes.NewUprobeAttacher(gpuAttacherName, attachCfg, m, nil, &uprobes.NativeBinaryInspector{})
 	if err != nil {
 		return nil, fmt.Errorf("error creating uprobes attacher: %w", err)
 	}
@@ -149,7 +201,7 @@ func startGPUProbe(buf bytecode.AssetReader, opts manager.Options, deps ProbeDep
 	}
 
 	p := &Probe{
-		mgr:      mgr,
+		m:        m,
 		cfg:      cfg,
 		attacher: attacher,
 		deps:     deps,
@@ -168,11 +220,7 @@ func startGPUProbe(buf bytecode.AssetReader, opts manager.Options, deps ProbeDep
 	p.startEventConsumer()
 	p.statsGenerator = newStatsGenerator(sysCtx, now, p.consumer.streamHandlers)
 
-	if err := mgr.InitWithOptions(buf, &opts); err != nil {
-		return nil, fmt.Errorf("failed to init manager: %w", err)
-	}
-
-	if err := mgr.Start(); err != nil {
+	if err := m.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start manager: %w", err)
 	}
 
@@ -189,7 +237,7 @@ func (p *Probe) Close() {
 		p.attacher.Stop()
 	}
 
-	_ = p.mgr.Stop(manager.CleanAll)
+	_ = p.m.Stop(manager.CleanAll)
 
 	if p.consumer != nil {
 		p.consumer.Stop()
@@ -224,7 +272,7 @@ func (p *Probe) startEventConsumer() {
 			RecordGetter:  handler.RecordGetter,
 		},
 	}
-	p.mgr.RingBuffers = append(p.mgr.RingBuffers, rb)
+	p.m.RingBuffers = append(p.m.RingBuffers, rb)
 	p.consumer = newCudaEventConsumer(handler, p.cfg)
 	p.consumer.Start()
 }
