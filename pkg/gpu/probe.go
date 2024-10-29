@@ -47,7 +47,7 @@ type ProbeDependencies struct {
 
 // Probe represents the GPU monitoring probe
 type Probe struct {
-	m              *manager.Manager
+	m              *ddebpf.Manager
 	cfg            *config.Config
 	consumer       *cudaEventConsumer
 	attacher       *uprobes.UprobeAttacher
@@ -65,7 +65,7 @@ func NewProbe(cfg *config.Config, deps ProbeDependencies) (*Probe, error) {
 	log.Tracef("starting %s probe...", sysconfig.GPUMonitoringModule)
 
 	allowRC := cfg.EnableRuntimeCompiler && cfg.AllowRuntimeCompiledFallback
-	var m *manager.Manager
+	var m *ddebpf.Manager
 	var err error
 
 	//try CO-RE first
@@ -97,7 +97,7 @@ func NewProbe(cfg *config.Config, deps ProbeDependencies) (*Probe, error) {
 	return probe, nil
 }
 
-func getRCGPU(cfg *config.Config) (*manager.Manager, error) {
+func getRCGPU(cfg *config.Config) (*ddebpf.Manager, error) {
 	buf, err := getRuntimeCompiledGPUMonitoring(cfg)
 	if err != nil {
 		return nil, err
@@ -107,9 +107,9 @@ func getRCGPU(cfg *config.Config) (*manager.Manager, error) {
 	return getManager(buf, manager.Options{})
 }
 
-func getCOREGPU(cfg *config.Config) (*manager.Manager, error) {
+func getCOREGPU(cfg *config.Config) (*ddebpf.Manager, error) {
 	asset := getAssetName("gpu", cfg.BPFDebug)
-	var m *manager.Manager
+	var m *ddebpf.Manager
 	var err error
 	err = ddebpf.LoadCOREAsset(asset, func(ar bytecode.AssetReader, o manager.Options) error {
 		m, err = getManager(ar, o)
@@ -126,7 +126,7 @@ func getAssetName(module string, debug bool) string {
 	return fmt.Sprintf("%s.o", module)
 }
 
-func getManager(buf io.ReaderAt, opts manager.Options) (*manager.Manager, error) {
+func getManager(buf io.ReaderAt, opts manager.Options) (*ddebpf.Manager, error) {
 	m := ddebpf.NewManagerWithDefault(&manager.Manager{
 		Maps: []*manager.Map{
 			{Name: cudaAllocCacheMap},
@@ -156,12 +156,12 @@ func getManager(buf io.ReaderAt, opts manager.Options) (*manager.Manager, error)
 		return nil, fmt.Errorf("failed to init manager: %w", err)
 	}
 
-	return m.Manager, nil
+	return m, nil
 }
 
 // TODO: in the future consider replacing that with a proper state management via public Init and Start methods.
 // for now we can keep this for simplicity
-func start(m *manager.Manager, deps ProbeDependencies, cfg *config.Config) (*Probe, error) {
+func start(m *ddebpf.Manager, deps ProbeDependencies, cfg *config.Config) (*Probe, error) {
 
 	// Note: this will later be replaced by a common way to enable the process monitor across system-probe
 	procMon := monitor.GetProcessMonitor()
