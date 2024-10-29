@@ -21,7 +21,6 @@ import (
 	log "github.com/DataDog/datadog-agent/comp/core/log/def"
 	taggercommon "github.com/DataDog/datadog-agent/comp/core/tagger/common"
 	taggerComp "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/local"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/utils"
@@ -138,9 +137,7 @@ func NewComponent(req Requires) Provides {
 	// 	taggerClient = createTaggerClient(local.NewFakeTagger(deps.Config, telemetryStore), deps.Log)
 	// }
 
-	if taggerClient != nil {
-		taggerClient.wmeta = req.Wmeta
-	}
+	taggerClient.wmeta = req.Wmeta
 
 	taggerClient.datadogConfig.dogstatsdEntityIDPrecedenceEnabled = req.Config.GetBool("dogstatsd_entity_id_precedence")
 	taggerClient.datadogConfig.originDetectionUnifiedEnabled = req.Config.GetBool("origin_detection_unified")
@@ -170,14 +167,7 @@ func NewComponent(req Requires) Provides {
 		}
 		// Main context passed to components, consistent with the one used in the workloadmeta component
 		mainCtx, _ := common.GetMainCtxCancel()
-		err = taggerClient.Start(mainCtx)
-		if err != nil && req.Params.FallBackToLocalIfRemoteTaggerFails {
-			req.Log.Warnf("Starting remote tagger failed. Falling back to local tagger: %s", err)
-			taggerClient.localTagger = local.NewTagger(req.Config, req.Wmeta, telemetryStore)
-			// Retry to start the local tagger
-			return taggerClient.Start(mainCtx)
-		}
-		return err
+		return taggerClient.Start(mainCtx)
 	}})
 	req.Lc.Append(compdef.Hook{OnStop: func(context.Context) error {
 		return taggerClient.Stop()

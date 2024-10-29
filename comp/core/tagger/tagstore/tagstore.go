@@ -17,8 +17,8 @@ import (
 	"github.com/benbjohnson/clock"
 
 	"github.com/DataDog/datadog-agent/comp/core/config"
-	genericstore "github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/generic_store"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/subscriber"
+	genericstore "github.com/DataDog/datadog-agent/comp/core/tagger/generic_store"
+	"github.com/DataDog/datadog-agent/comp/core/tagger/subscriber"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/pkg/status/health"

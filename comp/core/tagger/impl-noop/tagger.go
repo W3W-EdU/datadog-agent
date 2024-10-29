@@ -17,25 +17,12 @@ import (
 	"context"
 	"fmt"
 
-	"go.uber.org/fx"
-
-	"github.com/DataDog/datadog-agent/comp/core/tagger"
+	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	taggertypes "github.com/DataDog/datadog-agent/pkg/tagger/types"
 	"github.com/DataDog/datadog-agent/pkg/tagset"
-	"github.com/DataDog/datadog-agent/pkg/util/fxutil"
 )
-
-// Module defines the fx options for this component.
-func Module() fxutil.Module {
-	return fxutil.Component(
-		fx.Provide(
-			NewTaggerClient,
-		),
-	)
-
-}
 
 type noopTagger struct{}
 
@@ -109,7 +96,7 @@ func (n *noopTagger) DogstatsdCardinality() types.TagCardinality {
 	return types.LowCardinality
 }
 
-// NewTaggerClient returns a new noop tagger client
-func NewTaggerClient() tagger.Component {
+// NewComponent returns a new noop tagger component
+func NewComponent() tagger.Component {
 	return &noopTagger{}
 }

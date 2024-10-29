@@ -27,6 +27,8 @@ type Params struct {
 	AgentTypeForTagger                 AgentTypeForTagger
 	FallBackToLocalIfRemoteTaggerFails bool
 	RemoteFilter                       *types.Filter
+	RemoteTarget                       string
+	RemoteTokenFetcher                 func() (string, error)
 }
 
 // NewTaggerParamsForCoreAgent is a constructor function for creating core agent tagger params

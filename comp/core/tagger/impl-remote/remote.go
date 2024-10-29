@@ -3,8 +3,8 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-// Package taggerimpl implements a remote Tagger.
-package taggerimpl
+// Package remotetaggerimpl implements a remote Tagger.
+package remotetaggerimpl
 
 import (
 	"context"
@@ -26,13 +26,13 @@ import (
 	log "github.com/DataDog/datadog-agent/comp/core/log/def"
 	taggercommon "github.com/DataDog/datadog-agent/comp/core/tagger/common"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/empty"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	coretelemetry "github.com/DataDog/datadog-agent/comp/core/telemetry"
 	compdef "github.com/DataDog/datadog-agent/comp/def"
 	"github.com/DataDog/datadog-agent/pkg/api/security"
 	pb "github.com/DataDog/datadog-agent/pkg/proto/pbgo/core"
+	taggertypes "github.com/DataDog/datadog-agent/pkg/tagger/types"
 	"github.com/DataDog/datadog-agent/pkg/tagset"
 	"github.com/DataDog/datadog-agent/pkg/util/clusteragent"
 	grpcutil "github.com/DataDog/datadog-agent/pkg/util/grpc"
@@ -67,6 +67,7 @@ type remoteTagger struct {
 	options Options
 
 	cfg config.Component
+	log log.Component
 
 	conn   *grpc.ClientConn
 	client pb.AgentSecureClient
@@ -81,7 +82,6 @@ type remoteTagger struct {
 
 	telemetryTicker *time.Ticker
 	telemetryStore  *telemetry.Store
-	empty.Tagger
 }
 
 // Options contains the options needed to configure the remote tagger.
@@ -133,33 +133,17 @@ func CLCRunnerOptions(config config.Component) (Options, error) {
 func NewComponent(req Requires) (Provides, error) {
 	telemetryStore := telemetry.NewStore(req.Telemetry)
 
-	// var err error
-	var options Options
-	// switch deps.Params.AgentTypeForTagger {
-	// case taggerComp.CLCRunnerRemoteTaggerAgent:
-	// 	options, err = remote.CLCRunnerOptions(deps.Config)
-
-	// 	if err != nil {
-	// 		deps.Log.Errorf("unable to deps.Configure the remote tagger: %s", err)
-	// 		taggerClient = createTaggerClient(local.NewFakeTagger(deps.Config, telemetryStore), deps.Log)
-	// 	} else if options.Disabled {
-	// 		deps.Log.Errorf("remote tagger is disabled in clc runner.")
-	// 		taggerClient = createTaggerClient(local.NewFakeTagger(deps.Config, telemetryStore), deps.Log)
-	// 	} else {
-	// 		filter := types.NewFilterBuilder().Exclude(types.KubernetesPodUID).Build(types.HighCardinality)
-	// 		taggerClient = createTaggerClient(remote.NewTagger(options, deps.Config, telemetryStore, filter), deps.Log)
-	// 	}
-	// case taggerComp.NodeRemoteTaggerAgent:
-	// 	options, err := remote.NodeAgentOptions(deps.Config)
-	// 	taggerClient = createTaggerClient(remote.NewTagger(options, deps.Config, telemetryStore, types.NewMatchAllFilter()), deps.Log)
-
 	return Provides{
 		Comp: &remoteTagger{
-			options:        options,
+			options: Options{
+				Target:       req.Params.RemoteTarget,
+				TokenFetcher: req.Params.RemoteTokenFetcher,
+			},
 			cfg:            req.Config,
 			store:          newTagStore(req.Config, telemetryStore),
 			telemetryStore: telemetryStore,
 			filter:         req.Params.RemoteFilter,
+			log:            req.Log,
 		},
 	}, nil
 }
@@ -205,7 +189,7 @@ func (t *remoteTagger) Start(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("remote tagger initialized successfully")
+	t.log.Info("remote tagger initialized successfully")
 
 	go t.run()
 
@@ -223,7 +207,7 @@ func (t *remoteTagger) Stop() error {
 
 	t.telemetryTicker.Stop()
 
-	log.Info("remote tagger stopped successfully")
+	t.log.Info("remote tagger stopped successfully")
 
 	return nil
 }
@@ -314,6 +298,32 @@ func (t *remoteTagger) List() types.TaggerListResponse {
 	return resp
 }
 
+func (t *remoteTagger) GetEntityHash(types.EntityID, types.TagCardinality) string {
+	return ""
+}
+
+func (t *remoteTagger) AgentTags(types.TagCardinality) ([]string, error) {
+	return []string{}, nil
+}
+
+func (t *remoteTagger) GlobalTags(types.TagCardinality) ([]string, error) {
+	return []string{}, nil
+}
+
+func (t *remoteTagger) SetNewCaptureTagger(tagger.Component) {}
+
+func (t *remoteTagger) ResetCaptureTagger() {}
+
+func (t *remoteTagger) EnrichTags(tagset.TagsAccumulator, taggertypes.OriginInfo) {}
+
+func (t *remoteTagger) ChecksCardinality() types.TagCardinality {
+	return types.LowCardinality
+}
+
+func (t *remoteTagger) DogstatsdCardinality() types.TagCardinality {
+	return types.LowCardinality
+}
+
 // Subscribe returns a channel that receives a slice of events whenever an entity is
 // added, modified or deleted. It can send an initial burst of events only to the new
 // subscriber, without notifying all of the others.
@@ -334,7 +344,7 @@ func (t *remoteTagger) run() {
 
 		if t.stream == nil {
 			if err := t.startTaggerStream(noTimeout); err != nil {
-				log.Warnf("error received trying to start stream with target %q: %s", t.options.Target, err)
+				t.log.Warnf("error received trying to start stream with target %q: %s", t.options.Target, err)
 				continue
 			}
 		}
@@ -358,7 +368,7 @@ func (t *remoteTagger) run() {
 			t.ready = false
 			t.stream = nil
 
-			log.Warnf("error received from remote tagger: %s", err)
+			t.log.Warnf("error received from remote tagger: %s", err)
 
 			continue
 		}
@@ -367,7 +377,7 @@ func (t *remoteTagger) run() {
 
 		err = t.processResponse(response)
 		if err != nil {
-			log.Warnf("error processing event received from remote tagger: %s", err)
+			t.log.Warnf("error processing event received from remote tagger: %s", err)
 			continue
 		}
 	}
@@ -385,7 +395,7 @@ func (t *remoteTagger) processResponse(response *pb.StreamTagsResponse) error {
 	for _, ev := range response.Events {
 		eventType, err := convertEventType(ev.Type)
 		if err != nil {
-			log.Warnf("error processing event received from remote tagger: %s", err)
+			t.log.Warnf("error processing event received from remote tagger: %s", err)
 			continue
 		}
 
@@ -436,7 +446,7 @@ func (t *remoteTagger) startTaggerStream(maxElapsed time.Duration) error {
 
 		token, err := t.options.TokenFetcher()
 		if err != nil {
-			log.Infof("unable to fetch auth token, will possibly retry: %s", err)
+			t.log.Infof("unable to fetch auth token, will possibly retry: %s", err)
 			return err
 		}
 
@@ -457,11 +467,11 @@ func (t *remoteTagger) startTaggerStream(maxElapsed time.Duration) error {
 			Prefixes:    prefixes,
 		})
 		if err != nil {
-			log.Infof("unable to establish stream, will possibly retry: %s", err)
+			t.log.Infof("unable to establish stream, will possibly retry: %s", err)
 			return err
 		}
 
-		log.Info("tagger stream established successfully")
+		t.log.Info("tagger stream established successfully")
 
 		return nil
 	}, expBackoff)

@@ -12,14 +12,14 @@ import (
 	"sync"
 
 	"github.com/DataDog/datadog-agent/comp/core/config"
+	"github.com/DataDog/datadog-agent/comp/core/tagger/collectors"
 	taggercommon "github.com/DataDog/datadog-agent/comp/core/tagger/common"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/empty"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/tagstore"
+	"github.com/DataDog/datadog-agent/comp/core/tagger/tagstore"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
+	taggertypes "github.com/DataDog/datadog-agent/pkg/tagger/types"
 	"github.com/DataDog/datadog-agent/pkg/tagset"
 )
 
@@ -38,10 +38,9 @@ type localTagger struct {
 	ctx            context.Context
 	cancel         context.CancelFunc
 	telemetryStore *telemetry.Store
-	empty.Tagger
 }
 
-func newLocalTagger(cfg config.Component, workloadStore workloadmeta.Component, telemetryStore *telemetry.Store) *localTagger {
+func newLocalTagger(cfg config.Component, workloadStore workloadmeta.Component, telemetryStore *telemetry.Store) tagger.Component {
 	return &localTagger{
 		tagStore:       tagstore.NewTagStore(cfg, telemetryStore),
 		workloadStore:  workloadStore,
@@ -152,4 +151,30 @@ func (t *localTagger) ReplayTagger() tagger.ReplayTagger {
 // GetTaggerTelemetryStore returns tagger telemetry store
 func (t *localTagger) GetTaggerTelemetryStore() *telemetry.Store {
 	return t.telemetryStore
+}
+
+func (t *localTagger) GetEntityHash(types.EntityID, types.TagCardinality) string {
+	return ""
+}
+
+func (t *localTagger) AgentTags(types.TagCardinality) ([]string, error) {
+	return []string{}, nil
+}
+
+func (t *localTagger) GlobalTags(types.TagCardinality) ([]string, error) {
+	return []string{}, nil
+}
+
+func (t *localTagger) SetNewCaptureTagger(tagger.Component) {}
+
+func (t *localTagger) ResetCaptureTagger() {}
+
+func (t *localTagger) EnrichTags(tagset.TagsAccumulator, taggertypes.OriginInfo) {}
+
+func (t *localTagger) ChecksCardinality() types.TagCardinality {
+	return types.LowCardinality
+}
+
+func (t *localTagger) DogstatsdCardinality() types.TagCardinality {
+	return types.LowCardinality
 }

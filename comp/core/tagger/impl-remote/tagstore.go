@@ -3,14 +3,14 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-package taggerimpl
+package remotetaggerimpl
 
 import (
 	"sync"
 
 	"github.com/DataDog/datadog-agent/comp/core/config"
-	genericstore "github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/generic_store"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/subscriber"
+	genericstore "github.com/DataDog/datadog-agent/comp/core/tagger/generic_store"
+	"github.com/DataDog/datadog-agent/comp/core/tagger/subscriber"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 )

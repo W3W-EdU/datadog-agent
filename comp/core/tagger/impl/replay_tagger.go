@@ -13,10 +13,10 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/config"
 	taggercommon "github.com/DataDog/datadog-agent/comp/core/tagger/common"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/empty"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/tagstore"
+	"github.com/DataDog/datadog-agent/comp/core/tagger/tagstore"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
+	taggertypes "github.com/DataDog/datadog-agent/pkg/tagger/types"
 	"github.com/DataDog/datadog-agent/pkg/tagset"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
@@ -29,10 +29,9 @@ type replayTagger struct {
 
 	telemetryTicker *time.Ticker
 	telemetryStore  *telemetry.Store
-	empty.Tagger
 }
 
-func newReplayTagger(cfg config.Component, telemetryStore *telemetry.Store) *replayTagger {
+func newReplayTagger(cfg config.Component, telemetryStore *telemetry.Store) tagger.ReplayTagger {
 	return &replayTagger{
 		store:          tagstore.NewTagStore(cfg, telemetryStore),
 		telemetryStore: telemetryStore,
@@ -150,4 +149,30 @@ func (t *replayTagger) LoadState(state []types.Entity) {
 // GetEntity returns the entity corresponding to the specified id and an error
 func (t *replayTagger) GetEntity(entityID types.EntityID) (*types.Entity, error) {
 	return t.store.GetEntity(entityID)
+}
+
+func (t *replayTagger) GetEntityHash(types.EntityID, types.TagCardinality) string {
+	return ""
+}
+
+func (t *replayTagger) AgentTags(types.TagCardinality) ([]string, error) {
+	return []string{}, nil
+}
+
+func (t *replayTagger) GlobalTags(types.TagCardinality) ([]string, error) {
+	return []string{}, nil
+}
+
+func (t *replayTagger) SetNewCaptureTagger(tagger.Component) {}
+
+func (t *replayTagger) ResetCaptureTagger() {}
+
+func (t *replayTagger) EnrichTags(tagset.TagsAccumulator, taggertypes.OriginInfo) {}
+
+func (t *replayTagger) ChecksCardinality() types.TagCardinality {
+	return types.LowCardinality
+}
+
+func (t *replayTagger) DogstatsdCardinality() types.TagCardinality {
+	return types.LowCardinality
 }
