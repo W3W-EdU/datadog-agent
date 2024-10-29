@@ -26,8 +26,10 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/config"
 	log "github.com/DataDog/datadog-agent/comp/core/log/def"
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig"
-	"github.com/DataDog/datadog-agent/comp/core/tagger"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl"
+	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
+	localTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
+	remoteTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-remote"
+	taggertypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	wmcatalog "github.com/DataDog/datadog-agent/comp/core/workloadmeta/collectors/catalog"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
 	workloadmetafx "github.com/DataDog/datadog-agent/comp/core/workloadmeta/fx"
@@ -39,6 +41,7 @@ import (
 	processComponent "github.com/DataDog/datadog-agent/comp/process"
 	"github.com/DataDog/datadog-agent/comp/process/hostinfo"
 	"github.com/DataDog/datadog-agent/comp/process/types"
+	"github.com/DataDog/datadog-agent/pkg/api/security"
 	"github.com/DataDog/datadog-agent/pkg/process/checks"
 	proccontainers "github.com/DataDog/datadog-agent/pkg/process/util/containers"
 	"github.com/DataDog/datadog-agent/pkg/util/fxutil"
@@ -140,14 +143,16 @@ func MakeCommand(globalParamsGetter func() *command.GlobalParams, name string, a
 					return workloadmeta.Params{AgentType: catalog}
 				}),
 
-				// Provide tagger module
-				taggerimpl.Module(),
 				// Tagger must be initialized after agent config has been setup
-				fx.Provide(func(c config.Component) tagger.Params {
+				fx.Provide(func(c config.Component) fx.Option {
 					if c.GetBool("process_config.remote_tagger") {
-						return tagger.NewNodeRemoteTaggerParams()
+						return remoteTaggerfx.Module(tagger.Params{
+							RemoteTarget:       fmt.Sprintf(":%v", c.GetInt("cmd_port")),
+							RemoteTokenFetcher: func() (string, error) { return security.FetchAuthToken(c) },
+							RemoteFilter:       taggertypes.NewMatchAllFilter(),
+						})
 					}
-					return tagger.NewTaggerParams()
+					return localTaggerfx.Module(tagger.Params{})
 				}),
 				processComponent.Bundle(),
 				// InitSharedContainerProvider must be called before the application starts so the workloadmeta collector can be initiailized correctly.
