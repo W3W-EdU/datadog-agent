@@ -2,15 +2,17 @@ name "python3"
 
 default_version "3.12.6"
 
-dependency "libxcrypt"
-dependency "libffi"
-dependency "ncurses"
-dependency "zlib"
+unless windows?
+  dependency "libxcrypt"
+  dependency "libffi"
+  dependency "ncurses"
+  dependency "zlib"
+  dependency "bzip2"
+  dependency "libsqlite3"
+  dependency "liblzma"
+  dependency "libyaml"
+end
 dependency ENV["OMNIBUS_OPENSSL_SOFTWARE"] || "openssl"
-dependency "bzip2"
-dependency "libsqlite3"
-dependency "liblzma"
-dependency "libyaml"
 
 source :url => "https://python.org/ftp/python/#{version}/Python-#{version}.tgz",
        :sha256 => "85a4c1be906d20e5c5a69f2466b00da769c221d6a684acfd3a514dbf5bf10a66"
