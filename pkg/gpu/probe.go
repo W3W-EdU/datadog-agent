@@ -28,10 +28,26 @@ import (
 	manager "github.com/DataDog/ebpf-manager"
 )
 
+// probeFuncName stores the ebpf hook function name
+type probeFuncName = string
+
+// bpfMapName stores the name of the BPF maps storing statistics and other info
+type bpfMapName = string
+
 const (
-	cudaEventMap      = "cuda_events"
-	cudaAllocCacheMap = "cuda_alloc_cache"
-	gpuAttacherName   = "gpu"
+	cudaEventsMap     bpfMapName = "cuda_events"
+	cudaAllocCacheMap bpfMapName = "cuda_alloc_cache"
+	cudaSyncCacheMap  bpfMapName = "cuda_sync_cache"
+
+	cudaLaunchKernelProbe  probeFuncName = "uprobe__cudaLaunchKernel"
+	cudaMallocProbe        probeFuncName = "uprobe__cudaMalloc"
+	cudaMallocRetProbe     probeFuncName = "uretprobe__cudaMalloc"
+	cudaStreamSyncProbe    probeFuncName = "uprobe__cudaStreamSynchronize"
+	cudaStreamSyncRetProbe probeFuncName = "uretprobe__cudaStreamSynchronize"
+	cudaFreeProbe          probeFuncName = "uprobe__cudaFree"
+)
+const (
+	gpuAttacherName = "gpu"
 )
 
 const consumerChannelSize = 4096
@@ -128,8 +144,48 @@ func getAssetName(module string, debug bool) string {
 
 func getManager(buf io.ReaderAt, opts manager.Options) (*ddebpf.Manager, error) {
 	m := ddebpf.NewManagerWithDefault(&manager.Manager{
+		Probes: []*manager.Probe{
+			{
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFFuncName: cudaLaunchKernelProbe,
+				},
+			},
+			{
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFFuncName: cudaMallocProbe,
+				},
+			},
+			{
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFFuncName: cudaMallocRetProbe,
+				},
+			},
+			{
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFFuncName: cudaStreamSyncProbe,
+				},
+			},
+			{
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFFuncName: cudaStreamSyncRetProbe,
+				},
+			},
+			{
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFFuncName: cudaFreeProbe,
+				},
+			},
+		},
 		Maps: []*manager.Map{
-			{Name: cudaAllocCacheMap},
+			{
+				Name: cudaAllocCacheMap,
+			},
+			{
+				Name: cudaEventsMap,
+			},
+			{
+				Name: cudaSyncCacheMap,
+			},
 		}})
 
 	if opts.MapSpecEditors == nil {
@@ -144,7 +200,7 @@ func getManager(buf io.ReaderAt, opts manager.Options) (*ddebpf.Manager, error) 
 		ringbufSize = (minRingbufSize/pagesize + 1) * pagesize
 	}
 
-	opts.MapSpecEditors[cudaEventMap] = manager.MapSpecEditor{
+	opts.MapSpecEditors[cudaEventsMap] = manager.MapSpecEditor{
 		Type:       ebpf.RingBuf,
 		MaxEntries: uint32(ringbufSize),
 		KeySize:    0,
@@ -177,12 +233,12 @@ func start(m *ddebpf.Manager, deps ProbeDependencies, cfg *config.Config) (*Prob
 				ProbesSelector: []manager.ProbesSelector{
 					&manager.AllOf{
 						Selectors: []manager.ProbesSelector{
-							&manager.ProbeSelector{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFFuncName: "uprobe__cudaLaunchKernel"}},
-							&manager.ProbeSelector{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFFuncName: "uprobe__cudaMalloc"}},
-							&manager.ProbeSelector{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFFuncName: "uretprobe__cudaMalloc"}},
-							&manager.ProbeSelector{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFFuncName: "uprobe__cudaStreamSynchronize"}},
-							&manager.ProbeSelector{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFFuncName: "uretprobe__cudaStreamSynchronize"}},
-							&manager.ProbeSelector{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFFuncName: "uprobe__cudaFree"}},
+							&manager.ProbeSelector{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFFuncName: cudaLaunchKernelProbe}},
+							&manager.ProbeSelector{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFFuncName: cudaMallocProbe}},
+							&manager.ProbeSelector{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFFuncName: cudaMallocRetProbe}},
+							&manager.ProbeSelector{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFFuncName: cudaStreamSyncProbe}},
+							&manager.ProbeSelector{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFFuncName: cudaStreamSyncRetProbe}},
+							&manager.ProbeSelector{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFFuncName: cudaFreeProbe}},
 						},
 					},
 				},
@@ -263,7 +319,7 @@ func (p *Probe) cleanupFinished() {
 func (p *Probe) startEventConsumer() {
 	handler := ddebpf.NewRingBufferHandler(consumerChannelSize)
 	rb := &manager.RingBuffer{
-		Map: manager.Map{Name: cudaEventMap},
+		Map: manager.Map{Name: cudaEventsMap},
 		RingBufferOptions: manager.RingBufferOptions{
 			RecordHandler: handler.RecordHandler,
 			RecordGetter:  handler.RecordGetter,
