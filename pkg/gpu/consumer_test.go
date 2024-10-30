@@ -8,7 +8,6 @@
 package gpu
 
 import (
-	"github.com/DataDog/datadog-agent/pkg/gpu/probe"
 	"testing"
 	"time"
 
@@ -19,7 +18,7 @@ import (
 
 func TestConsumerCanStartAndStop(t *testing.T) {
 	cfg := config.NewConfig()
-	consumer := newCudaEventConsumer(probe.EventHandler, cfg)
+	consumer := newCudaEventConsumer(eventHandler, cfg)
 
 	consumer.Start()
 	require.Eventually(t, func() bool { return consumer.running.Load() }, 100*time.Millisecond, 10*time.Millisecond)
