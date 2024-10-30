@@ -9,9 +9,14 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 )
 
-// Params provides the kind of agent we're instantiating workloadmeta for
+// RemoteParams provides remote tagger parameters
 type RemoteParams struct {
 	RemoteFilter       *types.Filter
 	RemoteTarget       string
 	RemoteTokenFetcher func() (string, error)
+}
+
+// Params provides local tagger parameters
+type Params struct {
+	UseFakeTagger bool
 }

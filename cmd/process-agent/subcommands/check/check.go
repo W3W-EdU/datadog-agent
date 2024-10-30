@@ -152,7 +152,7 @@ func MakeCommand(globalParamsGetter func() *command.GlobalParams, name string, a
 							RemoteFilter:       taggertypes.NewMatchAllFilter(),
 						})
 					}
-					return localTaggerfx.Module()
+					return localTaggerfx.Module(tagger.Params{})
 				}),
 				processComponent.Bundle(),
 				// InitSharedContainerProvider must be called before the application starts so the workloadmeta collector can be initiailized correctly.

@@ -76,7 +76,6 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig/sysprobeconfigimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
 	taggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
-	localTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-local"
 	remoteTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-remote"
 	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry"
@@ -404,7 +403,9 @@ func getSharedFxOption() fx.Option {
 				if c.GetBool("clc_runner_remote_tagger_enabled") {
 					target, err := clusteragent.GetClusterAgentEndpoint()
 					if err != nil {
-						return localTaggerfx.Module()
+						return taggerfx.Module(tagger.Params{
+							UseFakeTagger: true,
+						})
 					}
 
 					// gRPC targets do not have a protocol. the DCA endpoint is always HTTPS,
@@ -415,10 +416,12 @@ func getSharedFxOption() fx.Option {
 						RemoteFilter:       taggerTypes.NewFilterBuilder().Exclude(taggerTypes.KubernetesPodUID).Build(taggerTypes.HighCardinality),
 					})
 				} else {
-					return localTaggerfx.Module()
+					return taggerfx.Module(tagger.Params{
+						UseFakeTagger: true,
+					})
 				}
 			}
-			return taggerfx.Module()
+			return taggerfx.Module(tagger.Params{})
 		}),
 		autodiscoveryimpl.Module(),
 		// InitSharedContainerProvider must be called before the application starts so the workloadmeta collector can be initiailized correctly.

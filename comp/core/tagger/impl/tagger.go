@@ -60,6 +60,7 @@ type Requires struct {
 	Log       log.Component
 	Wmeta     workloadmeta.Component
 	Telemetry coretelemetry.Component
+	Params    taggerComp.Params
 }
 
 type Provides struct {
@@ -84,7 +85,7 @@ type taggerWrapper struct {
 
 	mux sync.RWMutex
 
-	localTagger taggerComp.Component
+	defaultTagger taggerComp.Component
 
 	wmeta         workloadmeta.Component
 	cfg           config.Component
@@ -98,10 +99,10 @@ type taggerWrapper struct {
 	log log.Component
 }
 
-func createTaggerClient(localTagger taggerComp.Component, l log.Component) *taggerWrapper {
+func createTaggerClient(defaultTagger taggerComp.Component, l log.Component) *taggerWrapper {
 	return &taggerWrapper{
-		localTagger: localTagger,
-		log:         l,
+		defaultTagger: defaultTagger,
+		log:           l,
 	}
 }
 
@@ -110,7 +111,12 @@ func NewComponent(req Requires) Provides {
 	var taggerClient *taggerWrapper
 	telemetryStore := telemetry.NewStore(req.Telemetry)
 
-	taggerClient = createTaggerClient(newLocalTagger(req.Config, req.Wmeta, telemetryStore), req.Log)
+	if req.Params.UseFakeTagger {
+		taggerClient = createTaggerClient(newfakeTagger(req.Config, telemetryStore), req.Log)
+	} else {
+		taggerClient = createTaggerClient(newLocalTagger(req.Config, req.Wmeta, telemetryStore), req.Log)
+	}
+
 	taggerClient.wmeta = req.Wmeta
 
 	taggerClient.datadogConfig.dogstatsdEntityIDPrecedenceEnabled = req.Config.GetBool("dogstatsd_entity_id_precedence")
@@ -123,7 +129,7 @@ func NewComponent(req Requires) Provides {
 	taggerClient.tlmUDPOriginDetectionError = req.Telemetry.NewCounter("dogstatsd", "udp_origin_detection_error", nil, "Dogstatsd UDP origin detection error count")
 	taggerClient.telemetryStore = telemetryStore
 
-	req.Log.Info("TaggerClient is created, defaultTagger type: ", reflect.TypeOf(taggerClient.localTagger))
+	req.Log.Info("TaggerClient is created, defaultTagger type: ", reflect.TypeOf(taggerClient.defaultTagger))
 	req.Lc.Append(compdef.Hook{OnStart: func(_ context.Context) error {
 		var err error
 		checkCard := req.Config.GetString("checks_tag_cardinality")
@@ -165,12 +171,12 @@ func (t *taggerWrapper) writeList(w http.ResponseWriter, _ *http.Request) {
 
 // Start calls defaultTagger.Start
 func (t *taggerWrapper) Start(ctx context.Context) error {
-	return t.localTagger.Start(ctx)
+	return t.defaultTagger.Start(ctx)
 }
 
 // Stop calls defaultTagger.Stop
 func (t *taggerWrapper) Stop() error {
-	return t.localTagger.Stop()
+	return t.defaultTagger.Stop()
 }
 
 // ReplayTagger returns the replay tagger instance
@@ -185,7 +191,7 @@ func (t *taggerWrapper) GetTaggerTelemetryStore() *telemetry.Store {
 
 // GetDefaultTagger returns the default Tagger in current instance
 func (t *taggerWrapper) GetDefaultTagger() taggerComp.Component {
-	return t.localTagger
+	return t.defaultTagger
 }
 
 // GetEntity returns the hash for the provided entity id.
@@ -200,7 +206,7 @@ func (t *taggerWrapper) GetEntity(entityID types.EntityID) (*types.Entity, error
 	}
 	t.mux.RUnlock()
 
-	return t.localTagger.GetEntity(entityID)
+	return t.defaultTagger.GetEntity(entityID)
 }
 
 // Tag queries the captureTagger (for replay scenarios) or the defaultTagger.
@@ -217,7 +223,7 @@ func (t *taggerWrapper) Tag(entityID types.EntityID, cardinality types.TagCardin
 		}
 	}
 	t.mux.RUnlock()
-	return t.localTagger.Tag(entityID, cardinality)
+	return t.defaultTagger.Tag(entityID, cardinality)
 }
 
 // LegacyTag has the same behaviour as the Tag method, but it receives the entity id as a string and parses it.
@@ -249,7 +255,7 @@ func (t *taggerWrapper) AccumulateTagsFor(entityID types.EntityID, cardinality t
 		}
 	}
 	t.mux.RUnlock()
-	return t.localTagger.AccumulateTagsFor(entityID, cardinality, tb)
+	return t.defaultTagger.AccumulateTagsFor(entityID, cardinality, tb)
 }
 
 // GetEntityHash returns the hash for the tags associated with the given entity
@@ -275,7 +281,7 @@ func (t *taggerWrapper) Standard(entityID types.EntityID) ([]string, error) {
 		}
 	}
 	t.mux.RUnlock()
-	return t.localTagger.Standard(entityID)
+	return t.defaultTagger.Standard(entityID)
 }
 
 // AgentTags returns the agent tags
@@ -306,7 +312,7 @@ func (t *taggerWrapper) GlobalTags(cardinality types.TagCardinality) ([]string, 
 		}
 	}
 	t.mux.RUnlock()
-	return t.localTagger.Tag(taggercommon.GetGlobalEntityID(), cardinality)
+	return t.defaultTagger.Tag(taggercommon.GetGlobalEntityID(), cardinality)
 }
 
 // globalTagBuilder queries global tags that should apply to all data coming
@@ -322,12 +328,12 @@ func (t *taggerWrapper) globalTagBuilder(cardinality types.TagCardinality, tb ta
 		}
 	}
 	t.mux.RUnlock()
-	return t.localTagger.AccumulateTagsFor(taggercommon.GetGlobalEntityID(), cardinality, tb)
+	return t.defaultTagger.AccumulateTagsFor(taggercommon.GetGlobalEntityID(), cardinality, tb)
 }
 
 // List the content of the defaulTagger
 func (t *taggerWrapper) List() types.TaggerListResponse {
-	return t.localTagger.List()
+	return t.defaultTagger.List()
 }
 
 // SetNewCaptureTagger sets the tagger to be used when replaying a capture
@@ -532,5 +538,5 @@ func taggerCardinality(cardinality string,
 
 // Subscribe calls defaultTagger.Subscribe
 func (t *taggerWrapper) Subscribe(subscriptionID string, filter *types.Filter) (types.Subscription, error) {
-	return t.localTagger.Subscribe(subscriptionID, filter)
+	return t.defaultTagger.Subscribe(subscriptionID, filter)
 }

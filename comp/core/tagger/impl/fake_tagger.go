@@ -3,8 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-// Package localimpl contains the implementation of the local tagger.
-package localimpl
+package taggerimpl
 
 import (
 	"context"
@@ -15,9 +14,9 @@ import (
 	taggercommon "github.com/DataDog/datadog-agent/comp/core/tagger/common"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/tagstore"
-	taggerTelemetry "github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
+	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
-	"github.com/DataDog/datadog-agent/comp/core/telemetry"
+
 	taggertypes "github.com/DataDog/datadog-agent/pkg/tagger/types"
 	"github.com/DataDog/datadog-agent/pkg/tagset"
 )
@@ -25,29 +24,16 @@ import (
 type fakeTagger struct {
 	errors         map[string]error
 	store          *tagstore.TagStore
-	telemetryStore *taggerTelemetry.Store
+	telemetryStore *telemetry.Store
 	sync.RWMutex
 }
 
-type Requires struct {
-	Config    config.Component
-	Telemetry telemetry.Component
-}
-
-type Provides struct {
-	Comp tagger.Component
-}
-
 // NewComponent returns a new local tagger
-func NewComponent(req Requires) Provides {
-	telemetryStore := taggerTelemetry.NewStore(req.Telemetry)
-
-	return Provides{
-		Comp: &fakeTagger{
-			errors:         make(map[string]error),
-			store:          tagstore.NewTagStore(req.Config, telemetryStore),
-			telemetryStore: telemetryStore,
-		},
+func newfakeTagger(cfg config.Component, telemetryStore *telemetry.Store) tagger.Component {
+	return &fakeTagger{
+		errors:         make(map[string]error),
+		store:          tagstore.NewTagStore(cfg, telemetryStore),
+		telemetryStore: telemetryStore,
 	}
 }
 
@@ -103,7 +89,7 @@ func (f *fakeTagger) ReplayTagger() tagger.ReplayTagger {
 }
 
 // GetTaggerTelemetryStore returns tagger telemetry store
-func (f *fakeTagger) GetTaggerTelemetryStore() *taggerTelemetry.Store {
+func (f *fakeTagger) GetTaggerTelemetryStore() *telemetry.Store {
 	return f.telemetryStore
 }
 
