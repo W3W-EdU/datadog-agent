@@ -3,7 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-package local
+package tagstore
 
 import (
 	"fmt"
@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-agent/comp/core/tagger/tagstore"
 	taggerTelemetry "github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry"
@@ -49,7 +48,7 @@ func init() {
 func BenchmarkTagStoreThroughput(b *testing.B) {
 	tel := fxutil.Test[telemetry.Component](b, telemetryimpl.MockModule())
 	telemetryStore := taggerTelemetry.NewStore(tel)
-	store := tagstore.NewTagStore(configmock.New(b), telemetryStore)
+	store := NewTagStore(configmock.New(b), telemetryStore)
 
 	doneCh := make(chan struct{})
 	pruneTicker := time.NewTicker(time.Second)
@@ -96,7 +95,7 @@ func BenchmarkTagStore_processTagInfo(b *testing.B) {
 	tel := fxutil.Test[telemetry.Component](b, telemetryimpl.MockModule())
 	telemetryStore := taggerTelemetry.NewStore(tel)
 
-	store := tagstore.NewTagStore(configmock.New(b), telemetryStore)
+	store := NewTagStore(configmock.New(b), telemetryStore)
 
 	for i := 0; i < b.N; i++ {
 		processRandomTagInfoBatch(store)
@@ -126,7 +125,7 @@ func generateRandomTags() []string {
 	return tags
 }
 
-func processRandomTagInfoBatch(store *tagstore.TagStore) {
+func processRandomTagInfoBatch(store *TagStore) {
 	tagInfos := make([]*types.TagInfo, 0, batchSize)
 	for i := 0; i < batchSize; i++ {
 		tagInfos = append(tagInfos, generateRandomTagInfo())

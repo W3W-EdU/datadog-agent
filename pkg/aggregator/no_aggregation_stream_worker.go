@@ -9,7 +9,7 @@ import (
 	"expvar"
 	"time"
 
-	nooptagger "github.com/DataDog/datadog-agent/comp/core/tagger/noopimpl"
+	nooptagger "github.com/DataDog/datadog-agent/comp/core/tagger/impl-noop"
 	"github.com/DataDog/datadog-agent/pkg/aggregator/internal/util"
 	pkgconfigsetup "github.com/DataDog/datadog-agent/pkg/config/setup"
 	"github.com/DataDog/datadog-agent/pkg/metrics"
@@ -199,7 +199,7 @@ func (w *noAggregationStreamWorker) run() {
 							}
 
 							// enrich metric sample tags
-							sample.GetTags(w.taggerBuffer, w.metricBuffer, nooptagger.NewTaggerClient().EnrichTags)
+							sample.GetTags(w.taggerBuffer, w.metricBuffer, nooptagger.NewComponent().EnrichTags)
 							w.metricBuffer.AppendHashlessAccumulator(w.taggerBuffer)
 
 							// if the value is a rate, we have to account for the 10s interval

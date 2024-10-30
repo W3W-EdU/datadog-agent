@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	logmock "github.com/DataDog/datadog-agent/comp/core/log/mock"
-	"github.com/DataDog/datadog-agent/comp/core/tagger"
+	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	configmock "github.com/DataDog/datadog-agent/pkg/config/mock"
 	taggertypes "github.com/DataDog/datadog-agent/pkg/tagger/types"
