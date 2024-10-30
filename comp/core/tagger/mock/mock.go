@@ -85,6 +85,6 @@ func MockModule() fxutil.Module {
 }
 
 // SetupFakeTagger calls fxutil.Test to create a mock tagger for testing
-func SetupFakeTagger(t *testing.T) Mock {
+func SetupFakeTagger(t testing.TB) Mock {
 	return fxutil.Test[Mock](t, MockModule())
 }

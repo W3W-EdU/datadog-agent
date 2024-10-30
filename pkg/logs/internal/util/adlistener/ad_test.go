@@ -17,7 +17,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/autodiscovery/scheduler"
 	"github.com/DataDog/datadog-agent/comp/core/secrets/secretsimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl"
+	taggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
 	workloadmetafxmock "github.com/DataDog/datadog-agent/comp/core/workloadmeta/fx-mock"
 	"github.com/DataDog/datadog-agent/pkg/util/fxutil"
@@ -32,8 +32,9 @@ func TestListenersGetScheduleCalls(t *testing.T) {
 		autodiscoveryimpl.MockModule(),
 		workloadmetafxmock.MockModule(workloadmeta.NewParams()),
 		core.MockBundle(),
-		fx.Provide(taggerimpl.NewMock),
-		fx.Supply(tagger.NewFakeTaggerParams()),
+		taggerfx.Module(tagger.Params{
+			UseFakeTagger: true,
+		}),
 	)
 
 	got1 := make(chan struct{}, 1)

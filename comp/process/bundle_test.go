@@ -19,7 +19,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/status"
 	coreStatusImpl "github.com/DataDog/datadog-agent/comp/core/status/statusimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl"
+	taggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
 	workloadmetafx "github.com/DataDog/datadog-agent/comp/core/workloadmeta/fx"
 	"github.com/DataDog/datadog-agent/comp/dogstatsd/statsd"
@@ -47,8 +47,9 @@ func TestBundleDependencies(t *testing.T) {
 		coreStatusImpl.Module(),
 		settingsimpl.MockModule(),
 		statusimpl.Module(),
-		fx.Supply(tagger.NewFakeTaggerParams()),
-		taggerimpl.Module(),
+		taggerfx.Module(tagger.Params{
+			UseFakeTagger: true,
+		}),
 		fx.Supply(
 			status.Params{
 				PythonVersionGetFunc: python.GetPythonVersion,

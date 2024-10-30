@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	logmock "github.com/DataDog/datadog-agent/comp/core/log/mock"
-	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
+	taggerTelemetry "github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
+	noopTelemetry "github.com/DataDog/datadog-agent/comp/core/telemetry/noopsimpl"
 	configmock "github.com/DataDog/datadog-agent/pkg/config/mock"
 	taggertypes "github.com/DataDog/datadog-agent/pkg/tagger/types"
 	"github.com/DataDog/datadog-agent/pkg/tagset"
-	"github.com/DataDog/datadog-agent/pkg/util/fxutil"
 )
 
 // TODO Improve test coverage with dogstatsd/enrich tests once Origin Detection is refactored.
@@ -37,7 +37,9 @@ func (f *fakeCIDProvider) ContainerIDForPodUIDAndContName(podUID, contName strin
 
 func TestEnrichTags(t *testing.T) {
 	// Create fake tagger
-	fakeTagger := fxutil.Test[tagger.Mock](t, MockModule())
+	config := configmock.New(t)
+	telemetryStore := taggerTelemetry.NewStore(noopTelemetry.GetCompatComponent())
+	fakeTagger := NewFakeTagger(config, telemetryStore)
 
 	// Fill fake tagger with entities
 	fakeTagger.SetTags(types.NewEntityID(types.KubernetesPodUID, "pod"), "host", []string{"pod-low"}, []string{"pod-orch"}, []string{"pod-high"}, []string{"pod-std"})
@@ -89,7 +91,10 @@ func TestEnrichTags(t *testing.T) {
 }
 
 func TestEnrichTagsOrchestrator(t *testing.T) {
-	fakeTagger := fxutil.Test[tagger.Mock](t, MockModule())
+	// Create fake tagger
+	config := configmock.New(t)
+	telemetryStore := taggerTelemetry.NewStore(noopTelemetry.GetCompatComponent())
+	fakeTagger := NewFakeTagger(config, telemetryStore)
 	fakeTagger.SetTags(types.NewEntityID(types.ContainerID, "bar"), "fooSource", []string{"lowTag"}, []string{"orchTag"}, nil, nil)
 	tb := tagset.NewHashingTagsAccumulator()
 	fakeTagger.EnrichTags(tb, taggertypes.OriginInfo{ContainerIDFromSocket: "container_id://bar", Cardinality: "orchestrator"})
@@ -97,10 +102,12 @@ func TestEnrichTagsOrchestrator(t *testing.T) {
 }
 
 func TestEnrichTagsOptOut(t *testing.T) {
-	fakeTagger := fxutil.Test[tagger.Mock](t, MockModule())
+	// Create fake tagger
+	config := configmock.New(t)
+	config.SetWithoutSource("dogstatsd_origin_optout_enabled", true)
+	telemetryStore := taggerTelemetry.NewStore(noopTelemetry.GetCompatComponent())
+	fakeTagger := NewFakeTagger(config, telemetryStore)
 
-	cfg := configmock.New(t)
-	cfg.SetWithoutSource("dogstatsd_origin_optout_enabled", true)
 	fakeTagger.SetTags(types.NewEntityID(types.EntityIDPrefix("foo"), "bar"), "fooSource", []string{"lowTag"}, []string{"orchTag"}, nil, nil)
 	tb := tagset.NewHashingTagsAccumulator()
 	fakeTagger.EnrichTags(tb, taggertypes.OriginInfo{ContainerIDFromSocket: "foo://originID", PodUID: "pod-uid", ContainerID: "container-id", Cardinality: "none", ProductOrigin: taggertypes.ProductOriginDogStatsD})
@@ -169,7 +176,7 @@ func TestGenerateContainerIDFromExternalData(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			fakeTagger := TaggerClient{}
+			fakeTagger := taggerWrapper{}
 			containerID, err := fakeTagger.generateContainerIDFromExternalData(tt.externalData, tt.cidProvider)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, containerID)
@@ -178,7 +185,7 @@ func TestGenerateContainerIDFromExternalData(t *testing.T) {
 }
 
 func TestTaggerCardinality(t *testing.T) {
-	fakeTagger := TaggerClient{}
+	fakeTagger := taggerWrapper{}
 	tests := []struct {
 		name        string
 		cardinality string
