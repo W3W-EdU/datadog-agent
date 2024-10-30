@@ -46,7 +46,9 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/status/statusimpl"
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig/sysprobeconfigimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl"
+	localTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
+	remoteTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-remote"
+	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry"
 	wmcatalog "github.com/DataDog/datadog-agent/comp/core/workloadmeta/collectors/catalog"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
@@ -68,6 +70,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/remote-config/rcservicemrf"
 	"github.com/DataDog/datadog-agent/comp/serializer/compression/compressionimpl"
 	"github.com/DataDog/datadog-agent/pkg/aggregator"
+	"github.com/DataDog/datadog-agent/pkg/api/security"
 	"github.com/DataDog/datadog-agent/pkg/cli/standalone"
 	pkgcollector "github.com/DataDog/datadog-agent/pkg/collector"
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
@@ -78,6 +81,7 @@ import (
 	pkgconfigsetup "github.com/DataDog/datadog-agent/pkg/config/setup"
 	"github.com/DataDog/datadog-agent/pkg/serializer"
 	statuscollector "github.com/DataDog/datadog-agent/pkg/status/collector"
+	"github.com/DataDog/datadog-agent/pkg/util/clusteragent"
 	"github.com/DataDog/datadog-agent/pkg/util/defaultpaths"
 	"github.com/DataDog/datadog-agent/pkg/util/fxutil"
 	"github.com/DataDog/datadog-agent/pkg/util/optional"
@@ -172,8 +176,31 @@ func MakeCommand(globalParamsGetter func() GlobalParams) *cobra.Command {
 				apiimpl.Module(),
 				authtokenimpl.Module(),
 				fx.Supply(context.Background()),
-				fx.Provide(tagger.NewTaggerParamsForCoreAgent),
-				taggerimpl.Module(),
+				fx.Supply(func(c config.Component) fx.Option {
+					if pkgconfigsetup.IsCLCRunner(c) {
+						if c.GetBool("clc_runner_remote_tagger_enabled") {
+							target, err := clusteragent.GetClusterAgentEndpoint()
+							if err != nil {
+								return localTaggerFx.Module(tagger.Params{
+									UseFakeTagger: true,
+								})
+							}
+
+							// gRPC targets do not have a protocol. the DCA endpoint is always HTTPS,
+							// so a simple `TrimPrefix` is enough.
+							return remoteTaggerFx.Module(tagger.RemoteParams{
+								RemoteTarget:       strings.TrimPrefix(target, "https://"),
+								RemoteTokenFetcher: func() (string, error) { return security.GetClusterAgentAuthToken(c) },
+								RemoteFilter:       taggerTypes.NewFilterBuilder().Exclude(taggerTypes.KubernetesPodUID).Build(taggerTypes.HighCardinality),
+							})
+						} else {
+							return localTaggerFx.Module(tagger.Params{
+								UseFakeTagger: true,
+							})
+						}
+					}
+					return localTaggerFx.Module(tagger.Params{})
+				}),
 				autodiscoveryimpl.Module(),
 				forwarder.Bundle(defaultforwarder.NewParams(defaultforwarder.WithNoopForwarder())),
 				inventorychecksimpl.Module(),

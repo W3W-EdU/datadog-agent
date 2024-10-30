@@ -9,6 +9,7 @@ package run
 
 import (
 	"context"
+	"fmt"
 
 	ddgostatsd "github.com/DataDog/datadog-go/v5/statsd"
 	"github.com/spf13/cobra"
@@ -26,7 +27,8 @@ import (
 	log "github.com/DataDog/datadog-agent/comp/core/log/def"
 	logtracefx "github.com/DataDog/datadog-agent/comp/core/log/fx-trace"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl"
+	remoteTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-remote"
+	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry/telemetryimpl"
 
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
@@ -50,6 +52,7 @@ import (
 	traceagentcomp "github.com/DataDog/datadog-agent/comp/trace/agent/impl"
 	gzipfx "github.com/DataDog/datadog-agent/comp/trace/compression/fx-gzip"
 	traceconfig "github.com/DataDog/datadog-agent/comp/trace/config"
+	"github.com/DataDog/datadog-agent/pkg/api/security"
 	pkgconfigenv "github.com/DataDog/datadog-agent/pkg/config/env"
 	pkgconfigsetup "github.com/DataDog/datadog-agent/pkg/config/setup"
 	"github.com/DataDog/datadog-agent/pkg/serializer"
@@ -183,10 +186,13 @@ func runOTelAgentCommand(ctx context.Context, params *subcommands.GlobalParams, 
 			return configsyncimpl.NewParams(params.SyncTimeout, params.SyncDelay, true)
 		}),
 
-		fx.Provide(func() tagger.Params {
-			return tagger.NewNodeRemoteTaggerParamsWithFallback()
+		fx.Provide(func(c coreconfig.Component) fx.Option {
+			return remoteTaggerFx.Module(tagger.RemoteParams{
+				RemoteTarget:       fmt.Sprintf(":%v", c.GetInt("cmd_port")),
+				RemoteTokenFetcher: func() (string, error) { return security.FetchAuthToken(c) },
+				RemoteFilter:       taggerTypes.NewMatchAllFilter(),
+			})
 		}),
-		taggerimpl.Module(),
 		telemetryimpl.Module(),
 		fx.Provide(func(cfg traceconfig.Component) telemetry.TelemetryCollector {
 			return telemetry.NewCollector(cfg.Object())

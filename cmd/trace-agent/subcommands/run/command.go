@@ -9,6 +9,7 @@ package run
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -26,7 +27,9 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/secrets"
 	"github.com/DataDog/datadog-agent/comp/core/secrets/secretsimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl"
+	localTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
+	remoteTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-remote"
+	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry/telemetryimpl"
 	wmcatalog "github.com/DataDog/datadog-agent/comp/core/workloadmeta/collectors/catalog"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
@@ -37,6 +40,7 @@ import (
 	traceagentimpl "github.com/DataDog/datadog-agent/comp/trace/agent/impl"
 	zstdfx "github.com/DataDog/datadog-agent/comp/trace/compression/fx-zstd"
 	"github.com/DataDog/datadog-agent/comp/trace/config"
+	"github.com/DataDog/datadog-agent/pkg/api/security"
 	"github.com/DataDog/datadog-agent/pkg/trace/telemetry"
 	"github.com/DataDog/datadog-agent/pkg/util/fxutil"
 	"github.com/DataDog/datadog-agent/pkg/util/optional"
@@ -98,13 +102,16 @@ func runTraceAgentProcess(ctx context.Context, cliParams *Params, defaultConfPat
 		}),
 		autoexitimpl.Module(),
 		statsd.Module(),
-		fx.Provide(func(coreConfig coreconfig.Component) tagger.Params {
+		fx.Provide(func(coreConfig coreconfig.Component) fx.Option {
 			if coreConfig.GetBool("apm_config.remote_tagger") {
-				return tagger.NewNodeRemoteTaggerParamsWithFallback()
+				return remoteTaggerFx.Module(tagger.RemoteParams{
+					RemoteTarget:       fmt.Sprintf(":%v", coreConfig.GetInt("cmd_port")),
+					RemoteTokenFetcher: func() (string, error) { return security.FetchAuthToken(coreConfig) },
+					RemoteFilter:       taggerTypes.NewMatchAllFilter(),
+				})
 			}
-			return tagger.NewTaggerParams()
+			return localTaggerFx.Module(tagger.Params{})
 		}),
-		taggerimpl.Module(),
 		fx.Invoke(func(_ config.Component) {}),
 		// Required to avoid cyclic imports.
 		fx.Provide(func(cfg config.Component) telemetry.TelemetryCollector { return telemetry.NewCollector(cfg.Object()) }),

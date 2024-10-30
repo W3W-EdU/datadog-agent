@@ -27,7 +27,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/secrets"
 	"github.com/DataDog/datadog-agent/comp/core/secrets/secretsimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl"
+	localTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
 	nooptelemetry "github.com/DataDog/datadog-agent/comp/core/telemetry/noopsimpl"
 
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
@@ -73,10 +73,9 @@ func main() {
 				LogsGoroutines: config.GetBool("log_all_goroutines_when_unhealthy"),
 			}
 		}),
-		taggerimpl.Module(),
+		localTaggerFx.Module(tagger.Params{}),
 		healthprobeFx.Module(),
 		workloadmetafx.Module(workloadmeta.NewParams()),
-		fx.Supply(tagger.NewTaggerParams()),
 		fx.Supply(coreconfig.NewParams("", coreconfig.WithConfigMissingOK(true))),
 		coreconfig.Module(),
 		fx.Supply(secrets.NewEnabledParams()),

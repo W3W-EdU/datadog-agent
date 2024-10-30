@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/local"
+	taggerimpl "github.com/DataDog/datadog-agent/comp/core/tagger/impl"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	coretelemetry "github.com/DataDog/datadog-agent/comp/core/telemetry"
@@ -60,7 +60,7 @@ func Test_getInvolvedObjectTags(t *testing.T) {
 	telemetryComponent := fxutil.Test[coretelemetry.Component](t, telemetryimpl.MockModule())
 	telemetryStore := telemetry.NewStore(telemetryComponent)
 	cfg := configmock.New(t)
-	taggerInstance := local.NewFakeTagger(cfg, telemetryStore)
+	taggerInstance := taggerimpl.NewFakeTagger(cfg, telemetryStore)
 	taggerInstance.SetTags(types.NewEntityID(types.KubernetesPodUID, "nginx"), "workloadmeta-kubernetes_pod", nil, []string{"additional_pod_tag:nginx"}, nil, nil)
 	taggerInstance.SetTags(types.NewEntityID(types.KubernetesDeployment, "workload-redis/my-deployment-1"), "workloadmeta-kubernetes_deployment", nil, []string{"deployment_tag:redis-1"}, nil, nil)
 	taggerInstance.SetTags(types.NewEntityID(types.KubernetesDeployment, "default/my-deployment-2"), "workloadmeta-kubernetes_deployment", nil, []string{"deployment_tag:redis-2"}, nil, nil)

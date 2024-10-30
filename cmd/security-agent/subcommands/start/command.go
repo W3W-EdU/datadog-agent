@@ -45,7 +45,9 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig"
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig/sysprobeconfigimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl"
+	localTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
+	remoteTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-remote"
+	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry"
 	wmcatalog "github.com/DataDog/datadog-agent/comp/core/workloadmeta/collectors/catalog"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
@@ -53,6 +55,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/dogstatsd"
 	"github.com/DataDog/datadog-agent/comp/dogstatsd/statsd"
 	"github.com/DataDog/datadog-agent/comp/metadata/host/hostimpl"
+	"github.com/DataDog/datadog-agent/pkg/api/security"
 	"github.com/DataDog/datadog-agent/pkg/collector/python"
 	pkgCompliance "github.com/DataDog/datadog-agent/pkg/compliance"
 	"github.com/DataDog/datadog-agent/pkg/config/model"
@@ -111,12 +114,15 @@ func Commands(globalParams *command.GlobalParams) []*cobra.Command {
 						AgentType: catalog,
 					}
 				}),
-				taggerimpl.Module(),
-				fx.Provide(func(config config.Component) tagger.Params {
+				fx.Provide(func(config config.Component) fx.Option {
 					if config.GetBool("security_agent.remote_tagger") {
-						return tagger.NewNodeRemoteTaggerParams()
+						return remoteTaggerFx.Module(tagger.RemoteParams{
+							RemoteTarget:       fmt.Sprintf(":%v", config.GetInt("cmd_port")),
+							RemoteTokenFetcher: func() (string, error) { return security.FetchAuthToken(config) },
+							RemoteFilter:       taggerTypes.NewMatchAllFilter(),
+						})
 					}
-					return tagger.NewTaggerParams()
+					return localTaggerFx.Module(tagger.Params{})
 				}),
 				fx.Provide(func() startstop.Stopper {
 					return startstop.NewSerialStopper()

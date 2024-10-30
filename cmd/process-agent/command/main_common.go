@@ -32,7 +32,9 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig"
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig/sysprobeconfigimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl"
+	localTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
+	remoteTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-remote"
+	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	wmcatalog "github.com/DataDog/datadog-agent/comp/core/workloadmeta/collectors/catalog"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
 	workloadmetafx "github.com/DataDog/datadog-agent/comp/core/workloadmeta/fx"
@@ -51,6 +53,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/process/types"
 	remoteconfig "github.com/DataDog/datadog-agent/comp/remote-config"
 	"github.com/DataDog/datadog-agent/comp/remote-config/rcclient"
+	"github.com/DataDog/datadog-agent/pkg/api/security"
 	"github.com/DataDog/datadog-agent/pkg/collector/python"
 	"github.com/DataDog/datadog-agent/pkg/config/env"
 	"github.com/DataDog/datadog-agent/pkg/config/model"
@@ -139,9 +142,6 @@ func runApp(ctx context.Context, globalParams *GlobalParams) error {
 		// Provide remote config client bundle
 		remoteconfig.Bundle(),
 
-		// Provide tagger module
-		taggerimpl.Module(),
-
 		// Provide status modules
 		statusimpl.Module(),
 		coreStatusImpl.Module(),
@@ -174,15 +174,19 @@ func runApp(ctx context.Context, globalParams *GlobalParams) error {
 			return workloadmeta.Params{AgentType: catalog}
 		}),
 
-		// Provide the corresponding tagger Params to configure the tagger
-		fx.Provide(func(c config.Component) tagger.Params {
+		// Provide the corresponding tagger
+		fx.Provide(func(c config.Component) fx.Option {
 			if c.GetBool("process_config.remote_tagger") ||
 				// If the agent is running in ECS or ECS Fargate and the ECS task collection is enabled, use the remote tagger
 				// as remote tagger can return more tags than the local tagger.
 				((env.IsECS() || env.IsECSFargate()) && c.GetBool("ecs_task_collection_enabled")) {
-				return tagger.NewNodeRemoteTaggerParams()
+				return remoteTaggerFx.Module(tagger.RemoteParams{
+					RemoteTarget:       fmt.Sprintf(":%v", c.GetInt("cmd_port")),
+					RemoteTokenFetcher: func() (string, error) { return security.FetchAuthToken(c) },
+					RemoteFilter:       taggerTypes.NewMatchAllFilter(),
+				})
 			}
-			return tagger.NewTaggerParams()
+			return localTaggerFx.Module(tagger.Params{})
 		}),
 
 		// Provides specific features to our own fx wrapper (logging, lifecycle, shutdowner)

@@ -26,7 +26,7 @@ import (
 	acTelemetry "github.com/DataDog/datadog-agent/comp/core/autodiscovery/telemetry"
 	compcfg "github.com/DataDog/datadog-agent/comp/core/config"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl"
+	taggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry"
 	wmcatalog "github.com/DataDog/datadog-agent/comp/core/workloadmeta/collectors/catalog"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
@@ -89,8 +89,7 @@ func (suite *DockerListenerTestSuite) SetupSuite() {
 		}),
 		wmcatalog.GetCatalog(),
 		workloadmetafx.Module(workloadmeta.NewParams()),
-		taggerimpl.Module(),
-		fx.Supply(tagger.NewTaggerParams()),
+		taggerfx.Module(tagger.Params{}),
 	))
 	env.SetFeatures(suite.T(), env.Docker)
 	suite.wmeta = deps.WMeta
