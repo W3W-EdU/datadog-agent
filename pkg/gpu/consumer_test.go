@@ -8,19 +8,18 @@
 package gpu
 
 import (
+	"github.com/DataDog/datadog-agent/pkg/gpu/probe"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/gpu/config"
 )
 
 func TestConsumerCanStartAndStop(t *testing.T) {
-	handler := ddebpf.NewRingBufferHandler(consumerChannelSize)
 	cfg := config.NewConfig()
-	consumer := newCudaEventConsumer(handler, cfg)
+	consumer := newCudaEventConsumer(probe.EventHandler, cfg)
 
 	consumer.Start()
 	require.Eventually(t, func() bool { return consumer.running.Load() }, 100*time.Millisecond, 10*time.Millisecond)
