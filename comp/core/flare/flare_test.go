@@ -27,7 +27,7 @@ import (
 	logmock "github.com/DataDog/datadog-agent/comp/core/log/mock"
 	"github.com/DataDog/datadog-agent/comp/core/secrets/secretsimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl"
+	"github.com/DataDog/datadog-agent/comp/core/tagger/mock"
 	nooptelemetry "github.com/DataDog/datadog-agent/comp/core/telemetry/noopsimpl"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
 	workloadmetafxmock "github.com/DataDog/datadog-agent/comp/core/workloadmeta/fx-mock"
@@ -37,7 +37,7 @@ import (
 func TestFlareCreation(t *testing.T) {
 	realProvider := func(_ types.FlareBuilder) error { return nil }
 
-	fakeTagger := taggerimpl.SetupFakeTagger(t)
+	fakeTagger := mock.SetupFakeTagger(t)
 
 	f := newFlare(
 		fxutil.Test[dependencies](
@@ -78,7 +78,7 @@ func TestRunProviders(t *testing.T) {
 	var secondRan atomic.Bool
 	var secondDone atomic.Bool
 
-	fakeTagger := taggerimpl.SetupFakeTagger(t)
+	fakeTagger := mock.SetupFakeTagger(t)
 
 	deps := fxutil.Test[dependencies](
 		t,

@@ -20,6 +20,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/config"
 	log "github.com/DataDog/datadog-agent/comp/core/log/def"
 	taggercommon "github.com/DataDog/datadog-agent/comp/core/tagger/common"
+	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
 	taggerComp "github.com/DataDog/datadog-agent/comp/core/tagger/def"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
@@ -108,14 +109,7 @@ func createTaggerClient(defaultTagger taggerComp.Component, l log.Component) *ta
 
 // NewComponent
 func NewComponent(req Requires) Provides {
-	var taggerClient *taggerWrapper
-	telemetryStore := telemetry.NewStore(req.Telemetry)
-
-	if req.Params.UseFakeTagger {
-		taggerClient = createTaggerClient(newfakeTagger(req.Config, telemetryStore), req.Log)
-	} else {
-		taggerClient = createTaggerClient(newLocalTagger(req.Config, req.Wmeta, telemetryStore), req.Log)
-	}
+	taggerClient := NewTaggerClient(req.Params, req.Config, req.Wmeta, req.Log, req.Telemetry)
 
 	taggerClient.wmeta = req.Wmeta
 
@@ -127,7 +121,6 @@ func NewComponent(req Requires) Provides {
 	// backward compatible and because origin detection only affect
 	// dogstatsd metrics.
 	taggerClient.tlmUDPOriginDetectionError = req.Telemetry.NewCounter("dogstatsd", "udp_origin_detection_error", nil, "Dogstatsd UDP origin detection error count")
-	taggerClient.telemetryStore = telemetryStore
 
 	req.Log.Info("TaggerClient is created, defaultTagger type: ", reflect.TypeOf(taggerClient.defaultTagger))
 	req.Lc.Append(compdef.Hook{OnStart: func(_ context.Context) error {
@@ -155,6 +148,22 @@ func NewComponent(req Requires) Provides {
 	return Provides{
 		Comp:     taggerClient,
 		Endpoint: api.NewAgentEndpointProvider(taggerClient.writeList, "/tagger-list", "GET"),
+	}
+}
+
+func NewTaggerClient(params tagger.Params, cfg config.Component, wmeta workloadmeta.Component, log log.Component, telemetryComp coretelemetry.Component) *taggerWrapper {
+	var defaultTagger tagger.Component
+	telemetryStore := telemetry.NewStore(telemetryComp)
+	if params.UseFakeTagger {
+		defaultTagger = NewFakeTagger(cfg, telemetryStore)
+	} else {
+		defaultTagger = newLocalTagger(cfg, wmeta, telemetryStore)
+	}
+
+	return &taggerWrapper{
+		defaultTagger:  defaultTagger,
+		log:            log,
+		telemetryStore: telemetryStore,
 	}
 }
 

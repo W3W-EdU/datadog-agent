@@ -13,7 +13,6 @@ import (
 	"github.com/docker/docker/api/types/events"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl"
 	"github.com/DataDog/datadog-agent/pkg/aggregator/mocksender"
 	"github.com/DataDog/datadog-agent/pkg/metrics/event"
 	"github.com/DataDog/datadog-agent/pkg/metrics/servicecheck"
@@ -21,7 +20,7 @@ import (
 )
 
 func TestReportExitCodes(t *testing.T) {
-	fakeTagger := taggerimpl.SetupFakeTagger(t)
+	fakeTagger := mock.SetupFakeTagger(t)
 
 	dockerCheck := &DockerCheck{
 		instance: &DockerConfig{},
@@ -125,7 +124,7 @@ func TestReportExitCodes(t *testing.T) {
 }
 
 func TestAggregateEvents(t *testing.T) {
-	fakeTagger := taggerimpl.SetupFakeTagger(t)
+	fakeTagger := mock.SetupFakeTagger(t)
 
 	testCases := []struct {
 		events          []*docker.ContainerEvent
