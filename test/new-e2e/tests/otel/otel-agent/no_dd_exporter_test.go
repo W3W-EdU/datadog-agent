@@ -49,14 +49,5 @@ func (s *noDDExporterTestSuite) TestOTelAgentInstalled() {
 }
 
 func (s *noDDExporterTestSuite) TestFlare() {
-	expectedContents := []string{
-		"otel-agent",
-		"ddflare/dd-autoconfigured:",
-		"health_check/dd-autoconfigured:",
-		"pprof/dd-autoconfigured:",
-		"zpages/dd-autoconfigured:",
-		"infraattributes/dd-autoconfigured:",
-		"prometheus/dd-autoconfigured:",
-	}
-	utils.TestOTelFlare(s, expectedContents)
+	utils.TestOTelFlare(s, "", "", "")
 }
