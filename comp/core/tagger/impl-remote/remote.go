@@ -11,7 +11,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/cenkalti/backoff"
@@ -30,11 +29,9 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	coretelemetry "github.com/DataDog/datadog-agent/comp/core/telemetry"
 	compdef "github.com/DataDog/datadog-agent/comp/def"
-	"github.com/DataDog/datadog-agent/pkg/api/security"
 	pb "github.com/DataDog/datadog-agent/pkg/proto/pbgo/core"
 	taggertypes "github.com/DataDog/datadog-agent/pkg/tagger/types"
 	"github.com/DataDog/datadog-agent/pkg/tagset"
-	"github.com/DataDog/datadog-agent/pkg/util/clusteragent"
 	grpcutil "github.com/DataDog/datadog-agent/pkg/util/grpc"
 )
 
@@ -51,7 +48,7 @@ type Requires struct {
 	Lc        compdef.Lifecycle
 	Config    config.Component
 	Log       log.Component
-	Params    tagger.Params
+	Params    tagger.RemoteParams
 	Telemetry coretelemetry.Component
 }
 
@@ -91,61 +88,31 @@ type Options struct {
 	Disabled     bool
 }
 
-// NodeAgentOptions returns the tagger options used in the node agent.
-func NodeAgentOptions(config config.Component) (Options, error) {
-	return Options{
-		Target:       fmt.Sprintf(":%v", config.GetInt("cmd_port")),
-		TokenFetcher: func() (string, error) { return security.FetchAuthToken(config) },
-	}, nil
-}
-
-// NodeAgentOptionsForSecurityResolvers is a legacy function that returns the
-// same options as NodeAgentOptions, but it's used by the tag security resolvers only
-// TODO (component): remove this function once the security resolver migrates to component
-func NodeAgentOptionsForSecurityResolvers(cfg config.Component) (Options, error) {
-	return Options{
-		Target:       fmt.Sprintf(":%v", cfg.GetInt("cmd_port")),
-		TokenFetcher: func() (string, error) { return security.FetchAuthToken(cfg) },
-	}, nil
-}
-
-// CLCRunnerOptions returns the tagger options used in the CLC Runner.
-func CLCRunnerOptions(config config.Component) (Options, error) {
-	opts := Options{
-		Disabled: !config.GetBool("clc_runner_remote_tagger_enabled"),
-	}
-
-	if !opts.Disabled {
-		target, err := clusteragent.GetClusterAgentEndpoint()
-		if err != nil {
-			return opts, fmt.Errorf("unable to get cluster agent endpoint: %w", err)
-		}
-		// gRPC targets do not have a protocol. the DCA endpoint is always HTTPS,
-		// so a simple `TrimPrefix` is enough.
-		opts.Target = strings.TrimPrefix(target, "https://")
-		opts.TokenFetcher = func() (string, error) { return security.GetClusterAgentAuthToken(config) }
-
-	}
-	return opts, nil
-}
-
 // NewComponent returns a remote tagger
 func NewComponent(req Requires) (Provides, error) {
-	telemetryStore := telemetry.NewStore(req.Telemetry)
+	remoteTagger := NewRemoteTagger(req.Params, req.Config, req.Log, req.Telemetry)
 
 	return Provides{
-		Comp: &remoteTagger{
-			options: Options{
-				Target:       req.Params.RemoteTarget,
-				TokenFetcher: req.Params.RemoteTokenFetcher,
-			},
-			cfg:            req.Config,
-			store:          newTagStore(req.Config, telemetryStore),
-			telemetryStore: telemetryStore,
-			filter:         req.Params.RemoteFilter,
-			log:            req.Log,
-		},
+		Comp: remoteTagger,
 	}, nil
+}
+
+// NewRemoteTagger creates a new remote tagger.
+// TODO: (components) remove once we pass the remote tagger instance to pkg/security/resolvers/tags/resolver.go
+func NewRemoteTagger(params tagger.RemoteParams, cfg config.Component, log log.Component, telemetryComp coretelemetry.Component) *remoteTagger {
+	telemetryStore := telemetry.NewStore(telemetryComp)
+
+	return &remoteTagger{
+		options: Options{
+			Target:       params.RemoteTarget,
+			TokenFetcher: params.RemoteTokenFetcher,
+		},
+		cfg:            cfg,
+		store:          newTagStore(cfg, telemetryStore),
+		telemetryStore: telemetryStore,
+		filter:         params.RemoteFilter,
+		log:            log,
+	}
 }
 
 // Start creates the connection to the remote tagger and starts watching for

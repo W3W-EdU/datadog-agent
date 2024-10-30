@@ -3,7 +3,8 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-package local
+// Package localimpl contains the implementation of the local tagger.
+package localimpl
 
 import (
 	"context"
@@ -11,37 +12,47 @@ import (
 	"sync"
 
 	"github.com/DataDog/datadog-agent/comp/core/config"
-	"github.com/DataDog/datadog-agent/comp/core/tagger"
 	taggercommon "github.com/DataDog/datadog-agent/comp/core/tagger/common"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/empty"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/tagstore"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
+	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
+	"github.com/DataDog/datadog-agent/comp/core/tagger/tagstore"
+	taggerTelemetry "github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
+	"github.com/DataDog/datadog-agent/comp/core/telemetry"
+	taggertypes "github.com/DataDog/datadog-agent/pkg/tagger/types"
 	"github.com/DataDog/datadog-agent/pkg/tagset"
 )
 
-// FakeTagger implements the Tagger interface
-type FakeTagger struct {
+type fakeTagger struct {
 	errors         map[string]error
 	store          *tagstore.TagStore
-	telemetryStore *telemetry.Store
+	telemetryStore *taggerTelemetry.Store
 	sync.RWMutex
-	empty.Tagger
 }
 
-// NewFakeTagger returns a new fake Tagger
-func NewFakeTagger(cfg config.Component, telemetryStore *telemetry.Store) *FakeTagger {
-	return &FakeTagger{
-		errors:         make(map[string]error),
-		store:          tagstore.NewTagStore(cfg, telemetryStore),
-		telemetryStore: telemetryStore,
+type Requires struct {
+	Config    config.Component
+	Telemetry telemetry.Component
+}
+
+type Provides struct {
+	Comp tagger.Component
+}
+
+// NewComponent returns a new local tagger
+func NewComponent(req Requires) Provides {
+	telemetryStore := taggerTelemetry.NewStore(req.Telemetry)
+
+	return Provides{
+		Comp: &fakeTagger{
+			errors:         make(map[string]error),
+			store:          tagstore.NewTagStore(req.Config, telemetryStore),
+			telemetryStore: telemetryStore,
+		},
 	}
 }
 
-// FakeTagger specific interface
-
 // SetTags allows to set tags in store for a given source, entity
-func (f *FakeTagger) SetTags(entityID types.EntityID, source string, low, orch, high, std []string) {
+func (f *fakeTagger) SetTags(entityID types.EntityID, source string, low, orch, high, std []string) {
 	f.store.ProcessTagInfo([]*types.TagInfo{
 		{
 			Source:               source,
@@ -55,18 +66,18 @@ func (f *FakeTagger) SetTags(entityID types.EntityID, source string, low, orch, 
 }
 
 // SetGlobalTags allows to set tags in store for the global entity
-func (f *FakeTagger) SetGlobalTags(low, orch, high, std []string) {
+func (f *fakeTagger) SetGlobalTags(low, orch, high, std []string) {
 	f.SetTags(taggercommon.GetGlobalEntityID(), "static", low, orch, high, std)
 }
 
 // SetTagsFromInfo allows to set tags from list of TagInfo
-func (f *FakeTagger) SetTagsFromInfo(tags []*types.TagInfo) {
+func (f *fakeTagger) SetTagsFromInfo(tags []*types.TagInfo) {
 	f.store.ProcessTagInfo(tags)
 }
 
 // SetError allows to set an error to be returned when `Tag` or `AccumulateTagsFor` is called
 // for this entity and cardinality
-func (f *FakeTagger) SetError(entityID types.EntityID, cardinality types.TagCardinality, err error) {
+func (f *fakeTagger) SetError(entityID types.EntityID, cardinality types.TagCardinality, err error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -76,28 +87,28 @@ func (f *FakeTagger) SetError(entityID types.EntityID, cardinality types.TagCard
 // Tagger interface
 
 // Start not implemented in fake tagger
-func (f *FakeTagger) Start(_ context.Context) error {
+func (f *fakeTagger) Start(_ context.Context) error {
 	return nil
 }
 
 // Stop not implemented in fake tagger
-func (f *FakeTagger) Stop() error {
+func (f *fakeTagger) Stop() error {
 	return nil
 }
 
 // ReplayTagger returns the replay tagger instance
 // This is a no-op for the fake tagger
-func (f *FakeTagger) ReplayTagger() tagger.ReplayTagger {
+func (f *fakeTagger) ReplayTagger() tagger.ReplayTagger {
 	return nil
 }
 
 // GetTaggerTelemetryStore returns tagger telemetry store
-func (f *FakeTagger) GetTaggerTelemetryStore() *telemetry.Store {
+func (f *fakeTagger) GetTaggerTelemetryStore() *taggerTelemetry.Store {
 	return f.telemetryStore
 }
 
 // Tag fake implementation
-func (f *FakeTagger) Tag(entityID types.EntityID, cardinality types.TagCardinality) ([]string, error) {
+func (f *fakeTagger) Tag(entityID types.EntityID, cardinality types.TagCardinality) ([]string, error) {
 	tags := f.store.Lookup(entityID, cardinality)
 
 	key := f.getKey(entityID, cardinality)
@@ -112,7 +123,7 @@ func (f *FakeTagger) Tag(entityID types.EntityID, cardinality types.TagCardinali
 // If possible, avoid using this function, and use the Tag method instead.
 // This function exists in order not to break backward compatibility with rtloader and python
 // integrations using the tagger
-func (f *FakeTagger) LegacyTag(entity string, cardinality types.TagCardinality) ([]string, error) {
+func (f *fakeTagger) LegacyTag(entity string, cardinality types.TagCardinality) ([]string, error) {
 	prefix, id, err := taggercommon.ExtractPrefixAndID(entity)
 	if err != nil {
 		return nil, err
@@ -123,12 +134,12 @@ func (f *FakeTagger) LegacyTag(entity string, cardinality types.TagCardinality) 
 }
 
 // GlobalTags fake implementation
-func (f *FakeTagger) GlobalTags(cardinality types.TagCardinality) ([]string, error) {
+func (f *fakeTagger) GlobalTags(cardinality types.TagCardinality) ([]string, error) {
 	return f.Tag(taggercommon.GetGlobalEntityID(), cardinality)
 }
 
 // AccumulateTagsFor fake implementation
-func (f *FakeTagger) AccumulateTagsFor(entityID types.EntityID, cardinality types.TagCardinality, tb tagset.TagsAccumulator) error {
+func (f *fakeTagger) AccumulateTagsFor(entityID types.EntityID, cardinality types.TagCardinality, tb tagset.TagsAccumulator) error {
 	tags, err := f.Tag(entityID, cardinality)
 	if err != nil {
 		return err
@@ -139,26 +150,48 @@ func (f *FakeTagger) AccumulateTagsFor(entityID types.EntityID, cardinality type
 }
 
 // Standard fake implementation
-func (f *FakeTagger) Standard(entityID types.EntityID) ([]string, error) {
+func (f *fakeTagger) Standard(entityID types.EntityID) ([]string, error) {
 	return f.store.LookupStandard(entityID)
 }
 
 // GetEntity returns faked entity corresponding to the specified id and an error
-func (f *FakeTagger) GetEntity(entityID types.EntityID) (*types.Entity, error) {
+func (f *fakeTagger) GetEntity(entityID types.EntityID) (*types.Entity, error) {
 	return f.store.GetEntity(entityID)
 }
 
 // List fake implementation
-func (f *FakeTagger) List() types.TaggerListResponse {
+func (f *fakeTagger) List() types.TaggerListResponse {
 	return f.store.List()
 }
 
 // Subscribe fake implementation
-func (f *FakeTagger) Subscribe(subscriptionID string, filter *types.Filter) (types.Subscription, error) {
+func (f *fakeTagger) Subscribe(subscriptionID string, filter *types.Filter) (types.Subscription, error) {
 	return f.store.Subscribe(subscriptionID, filter)
 }
 
 // Fake internals
-func (f *FakeTagger) getKey(entity types.EntityID, cardinality types.TagCardinality) string {
+func (f *fakeTagger) getKey(entity types.EntityID, cardinality types.TagCardinality) string {
 	return entity.String() + strconv.FormatInt(int64(cardinality), 10)
+}
+
+func (f *fakeTagger) GetEntityHash(types.EntityID, types.TagCardinality) string {
+	return ""
+}
+
+func (f *fakeTagger) AgentTags(types.TagCardinality) ([]string, error) {
+	return []string{}, nil
+}
+
+func (f *fakeTagger) SetNewCaptureTagger(tagger.Component) {}
+
+func (f *fakeTagger) ResetCaptureTagger() {}
+
+func (f *fakeTagger) EnrichTags(tagset.TagsAccumulator, taggertypes.OriginInfo) {}
+
+func (f *fakeTagger) ChecksCardinality() types.TagCardinality {
+	return types.LowCardinality
+}
+
+func (f *fakeTagger) DogstatsdCardinality() types.TagCardinality {
+	return types.LowCardinality
 }

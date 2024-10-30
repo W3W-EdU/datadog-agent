@@ -59,7 +59,6 @@ type Requires struct {
 	Config    config.Component
 	Log       log.Component
 	Wmeta     workloadmeta.Component
-	Params    taggerComp.Params
 	Telemetry coretelemetry.Component
 }
 
@@ -111,32 +110,7 @@ func NewComponent(req Requires) Provides {
 	var taggerClient *taggerWrapper
 	telemetryStore := telemetry.NewStore(req.Telemetry)
 
-	// switch deps.Params.AgentTypeForTagger {
-	// case taggerComp.CLCRunnerRemoteTaggerAgent:
-	// 	options, err := remote.CLCRunnerOptions(deps.Config)
-
-	// 	if err != nil {
-	// 		deps.Log.Errorf("unable to deps.Configure the remote tagger: %s", err)
-	// 		taggerClient = createTaggerClient(local.NewFakeTagger(deps.Config, telemetryStore), deps.Log)
-	// 	} else if options.Disabled {
-	// 		deps.Log.Errorf("remote tagger is disabled in clc runner.")
-	// 		taggerClient = createTaggerClient(local.NewFakeTagger(deps.Config, telemetryStore), deps.Log)
-	// 	} else {
-	// 		filter := types.NewFilterBuilder().Exclude(types.KubernetesPodUID).Build(types.HighCardinality)
-	// 		taggerClient = createTaggerClient(remote.NewTagger(options, deps.Config, telemetryStore, filter), deps.Log)
-	// 	}
-	// case taggerComp.NodeRemoteTaggerAgent:
-	// 	options, _ := remote.NodeAgentOptions(deps.Config)
-	// 	taggerClient = createTaggerClient(remote.NewTagger(options, deps.Config, telemetryStore, types.NewMatchAllFilter()), deps.Log)
-	// case taggerComp.LocalTaggerAgent:
 	taggerClient = createTaggerClient(newLocalTagger(req.Config, req.Wmeta, telemetryStore), req.Log)
-	// case taggerComp.FakeTagger:
-	// 	// all binaries are expected to provide their own tagger at startup. we
-	// 	// provide a fake tagger for testing purposes, as calling the global
-	// 	// tagger without proper initialization is very common there.
-	// 	taggerClient = createTaggerClient(local.NewFakeTagger(deps.Config, telemetryStore), deps.Log)
-	// }
-
 	taggerClient.wmeta = req.Wmeta
 
 	taggerClient.datadogConfig.dogstatsdEntityIDPrecedenceEnabled = req.Config.GetBool("dogstatsd_entity_id_precedence")

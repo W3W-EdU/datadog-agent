@@ -3,24 +3,21 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2024-present Datadog, Inc.
 
-// Package fx provides the fx module for the remote tagger component
+// Package fx provides the fx module for the tagger component
 package fx
 
 import (
-	"go.uber.org/fx"
-
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	remotetaggerimpl "github.com/DataDog/datadog-agent/comp/core/tagger/impl-remote"
+	localimpl "github.com/DataDog/datadog-agent/comp/core/tagger/impl-local"
 	"github.com/DataDog/datadog-agent/pkg/util/fxutil"
 )
 
 // Module defines the fx options for this component
-func Module(params tagger.RemoteParams) fxutil.Module {
+func Module() fxutil.Module {
 	return fxutil.Component(
 		fxutil.ProvideComponentConstructor(
-			remotetaggerimpl.NewComponent,
+			localimpl.NewComponent,
 		),
-		fx.Supply(params),
 		fxutil.ProvideOptional[tagger.Component](),
 	)
 }

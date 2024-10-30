@@ -8,12 +8,14 @@ package tags
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
-	"github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/remote"
-	taggerTelemetry "github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
+	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
+	remoteTagger "github.com/DataDog/datadog-agent/comp/core/tagger/impl-remote"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry"
+	"github.com/DataDog/datadog-agent/pkg/api/security"
 	pkgconfigsetup "github.com/DataDog/datadog-agent/pkg/config/setup"
 	"github.com/DataDog/datadog-agent/pkg/security/probe/config"
 	"github.com/DataDog/datadog-agent/pkg/security/utils"
@@ -102,14 +104,17 @@ func (t *DefaultResolver) Stop() error {
 
 // NewResolver returns a new tags resolver
 func NewResolver(config *config.Config, telemetry telemetry.Component) Resolver {
+	ddConfig := pkgconfigsetup.Datadog()
+
 	if config.RemoteTaggerEnabled {
-		options, err := remote.NodeAgentOptionsForSecurityResolvers(pkgconfigsetup.Datadog())
-		if err != nil {
-			log.Errorf("unable to configure the remote tagger: %s", err)
-		} else {
-			return &DefaultResolver{
-				tagger: remote.NewTagger(options, pkgconfigsetup.Datadog(), taggerTelemetry.NewStore(telemetry), types.NewMatchAllFilter()),
-			}
+		params := tagger.RemoteParams{
+			RemoteFilter:       types.NewMatchAllFilter(),
+			RemoteTarget:       fmt.Sprintf(":%v", ddConfig.GetInt("cmd_port")),
+			RemoteTokenFetcher: func() (string, error) { return security.FetchAuthToken(ddConfig) },
+		}
+		return &DefaultResolver{
+			// TODO: (components) use the actual remote tagger instance from the Fx entry point
+			tagger: remoteTagger.NewRemoteTagger(params, ddConfig, log.NewWrapper(2), telemetry),
 		}
 	}
 	return &DefaultResolver{

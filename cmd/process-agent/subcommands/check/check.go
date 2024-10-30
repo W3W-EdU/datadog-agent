@@ -146,13 +146,13 @@ func MakeCommand(globalParamsGetter func() *command.GlobalParams, name string, a
 				// Tagger must be initialized after agent config has been setup
 				fx.Provide(func(c config.Component) fx.Option {
 					if c.GetBool("process_config.remote_tagger") {
-						return remoteTaggerfx.Module(tagger.Params{
+						return remoteTaggerfx.Module(tagger.RemoteParams{
 							RemoteTarget:       fmt.Sprintf(":%v", c.GetInt("cmd_port")),
 							RemoteTokenFetcher: func() (string, error) { return security.FetchAuthToken(c) },
 							RemoteFilter:       taggertypes.NewMatchAllFilter(),
 						})
 					}
-					return localTaggerfx.Module(tagger.Params{})
+					return localTaggerfx.Module()
 				}),
 				processComponent.Bundle(),
 				// InitSharedContainerProvider must be called before the application starts so the workloadmeta collector can be initiailized correctly.

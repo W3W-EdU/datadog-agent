@@ -10,16 +10,8 @@ import (
 )
 
 // Params provides the kind of agent we're instantiating workloadmeta for
-type Params struct {
+type RemoteParams struct {
 	RemoteFilter       *types.Filter
 	RemoteTarget       string
 	RemoteTokenFetcher func() (string, error)
 }
-
-// // NewTaggerParamsForCoreAgent is a constructor function for creating core agent tagger params
-// func NewTaggerParamsForCoreAgent(_ config.Component) Params {
-// 	if pkgconfigsetup.IsCLCRunner(pkgconfigsetup.Datadog()) {
-// 		return NewCLCRunnerRemoteTaggerParams()
-// 	}
-// 	return NewTaggerParams()
-// }
