@@ -122,11 +122,10 @@ func Commands(globalParams *command.GlobalParams) []*cobra.Command {
 								RemoteTokenFetcher: func() (string, error) { return security.GetClusterAgentAuthToken(c) },
 								RemoteFilter:       taggerTypes.NewFilterBuilder().Exclude(taggerTypes.KubernetesPodUID).Build(taggerTypes.HighCardinality),
 							})
-						} else {
-							return taggerfx.Module(tagger.Params{
-								UseFakeTagger: true,
-							})
 						}
+						return taggerfx.Module(tagger.Params{
+							UseFakeTagger: true,
+						})
 					}
 					return taggerfx.Module(tagger.Params{})
 				}),

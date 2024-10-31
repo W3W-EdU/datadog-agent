@@ -10,6 +10,7 @@ package cri
 import (
 	"testing"
 
+	taggerMock "github.com/DataDog/datadog-agent/comp/core/tagger/mock"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/containers/generic"
 	"github.com/DataDog/datadog-agent/pkg/util/containers/cri"
@@ -36,7 +37,7 @@ func TestCriCheck(t *testing.T) {
 		"cID100": mock.GetFullSampleContainerEntry(),
 		"cID101": mock.GetFullSampleContainerEntry(),
 	}
-	fakeTagger := mock.SetupFakeTagger(t)
+	fakeTagger := taggerMock.SetupFakeTagger(t)
 
 	// Inject mock processor in check
 	mockCri := &crimock.MockCRIClient{}

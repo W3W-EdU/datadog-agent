@@ -6,6 +6,7 @@
 //go:build test
 // +build test
 
+// Package mock contains the implementation of the mock for the tagger component.
 package mock
 
 import (
@@ -16,12 +17,18 @@ import (
 
 	api "github.com/DataDog/datadog-agent/comp/api/api/def"
 	"github.com/DataDog/datadog-agent/comp/core/config"
+	log "github.com/DataDog/datadog-agent/comp/core/log/def"
+	logmock "github.com/DataDog/datadog-agent/comp/core/log/mock"
+	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig/sysprobeconfigimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
 	taggerimpl "github.com/DataDog/datadog-agent/comp/core/tagger/impl"
-	taggerTelemetry "github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry"
 	noopTelemetry "github.com/DataDog/datadog-agent/comp/core/telemetry/noopsimpl"
+	"github.com/DataDog/datadog-agent/comp/core/telemetry/telemetryimpl"
+	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
+	workloadmetafx "github.com/DataDog/datadog-agent/comp/core/workloadmeta/fx"
+	configmock "github.com/DataDog/datadog-agent/pkg/config/mock"
 	"github.com/DataDog/datadog-agent/pkg/util/fxutil"
 )
 
@@ -38,7 +45,7 @@ type Mock interface {
 
 // mockTaggerClient is a mock of the tagger Component
 type mockTaggerClient struct {
-	*taggerimpl.FakeTagger
+	*taggerimpl.TaggerWrapper
 }
 
 // mockHandleRequest is a simple mocked http.Handler function to test the route is registered correctly on the api component
@@ -46,7 +53,27 @@ func (m *mockTaggerClient) mockHandleRequest(w http.ResponseWriter, _ *http.Requ
 	w.Write([]byte("OK"))
 }
 
-// MockProvides is a mock of the tagger.Component provides struct to test endpoints register properly
+// New returns a Mock
+func New(t testing.TB) Mock {
+	c := configmock.New(t)
+	params := tagger.Params{
+		UseFakeTagger: true,
+	}
+	logComponent := logmock.New(t)
+	wmeta := fxutil.Test[workloadmeta.Component](t,
+		fx.Provide(func() log.Component { return logComponent }),
+		fx.Provide(func() config.Component { return c }),
+		workloadmetafx.Module(workloadmeta.NewParams()),
+	)
+
+	tagger := taggerimpl.NewTaggerClient(params, c, wmeta, logComponent, noopTelemetry.GetCompatComponent())
+
+	return &mockTaggerClient{
+		tagger,
+	}
+}
+
+// MockProvides is a struct containing the mock and the endpoint
 type MockProvides struct {
 	fx.Out
 
@@ -58,15 +85,21 @@ type dependencies struct {
 	fx.In
 
 	Config    config.Component
+	Log       log.Component
+	WMeta     workloadmeta.Component
 	Telemetry telemetry.Component
 }
 
-// New returns a MockTagger
-func New(deps dependencies) MockProvides {
-	telemetryStore := taggerTelemetry.NewStore(deps.Telemetry)
-	taggerClient := taggerimpl.NewFakeTagger(deps.Config, telemetryStore)
+// NewMock returns a mockProvides
+func NewMock(deps dependencies) MockProvides {
+	params := tagger.Params{
+		UseFakeTagger: true,
+	}
+
+	tagger := taggerimpl.NewTaggerClient(params, deps.Config, deps.WMeta, deps.Log, deps.Telemetry)
+
 	c := &mockTaggerClient{
-		taggerClient,
+		tagger,
 	}
 	return MockProvides{
 		Comp:     c,
@@ -77,14 +110,32 @@ func New(deps dependencies) MockProvides {
 // MockModule is a module containing the mock, useful for testing
 func MockModule() fxutil.Module {
 	return fxutil.Component(
-		fx.Provide(New),
+		fx.Provide(NewMock),
 		fx.Supply(config.Params{}),
+		fx.Supply(log.Params{}),
+		fx.Provide(func(t testing.TB) log.Component { return logmock.New(t) }),
 		config.MockModule(),
-		noopTelemetry.Module(),
+		sysprobeconfigimpl.MockModule(),
+		workloadmetafx.Module(workloadmeta.NewParams()),
+		telemetryimpl.MockModule(),
 	)
 }
 
 // SetupFakeTagger calls fxutil.Test to create a mock tagger for testing
 func SetupFakeTagger(t testing.TB) Mock {
 	return fxutil.Test[Mock](t, MockModule())
+}
+
+// SetTags calls faketagger SetTags which sets the tags for an entity
+func (m *mockTaggerClient) SetTags(entity types.EntityID, source string, low, orch, high, std []string) {
+	if v, ok := m.TaggerWrapper.GetDefaultTagger().(*taggerimpl.FakeTagger); ok {
+		v.SetTags(entity, source, low, orch, high, std)
+	}
+}
+
+// SetGlobalTags calls faketagger SetGlobalTags which sets the tags for the global entity
+func (m *mockTaggerClient) SetGlobalTags(low, orch, high, std []string) {
+	if v, ok := m.TaggerWrapper.GetDefaultTagger().(*taggerimpl.FakeTagger); ok {
+		v.SetGlobalTags(low, orch, high, std)
+	}
 }

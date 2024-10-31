@@ -21,6 +21,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/tagset"
 )
 
+// FakeTagger is a fake implementation of the tagger interface
 type FakeTagger struct {
 	errors         map[string]error
 	store          *tagstore.TagStore
@@ -28,7 +29,7 @@ type FakeTagger struct {
 	sync.RWMutex
 }
 
-func NewFakeTagger(cfg config.Component, telemetryStore *telemetry.Store) *FakeTagger {
+func newFakeTagger(cfg config.Component, telemetryStore *telemetry.Store) *FakeTagger {
 	return &FakeTagger{
 		errors:         make(map[string]error),
 		store:          tagstore.NewTagStore(cfg, telemetryStore),
@@ -159,24 +160,31 @@ func (f *FakeTagger) getKey(entity types.EntityID, cardinality types.TagCardinal
 	return entity.String() + strconv.FormatInt(int64(cardinality), 10)
 }
 
+// GetEntityHash noop
 func (f *FakeTagger) GetEntityHash(types.EntityID, types.TagCardinality) string {
 	return ""
 }
 
+// AgentTags noop
 func (f *FakeTagger) AgentTags(types.TagCardinality) ([]string, error) {
 	return []string{}, nil
 }
 
+// SetNewCaptureTagger noop
 func (f *FakeTagger) SetNewCaptureTagger(tagger.Component) {}
 
+// ResetCaptureTagger noop
 func (f *FakeTagger) ResetCaptureTagger() {}
 
+// EnrichTags noop
 func (f *FakeTagger) EnrichTags(tagset.TagsAccumulator, taggertypes.OriginInfo) {}
 
+// ChecksCardinality noop
 func (f *FakeTagger) ChecksCardinality() types.TagCardinality {
 	return types.LowCardinality
 }
 
+// DogstatsdCardinality noop
 func (f *FakeTagger) DogstatsdCardinality() types.TagCardinality {
 	return types.LowCardinality
 }

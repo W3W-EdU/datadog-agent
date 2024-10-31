@@ -27,7 +27,7 @@ import (
 	logmock "github.com/DataDog/datadog-agent/comp/core/log/mock"
 	"github.com/DataDog/datadog-agent/comp/core/secrets/secretsimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	"github.com/DataDog/datadog-agent/comp/core/tagger/mock"
+	mockTagger "github.com/DataDog/datadog-agent/comp/core/tagger/mock"
 	nooptelemetry "github.com/DataDog/datadog-agent/comp/core/telemetry/noopsimpl"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
 	workloadmetafxmock "github.com/DataDog/datadog-agent/comp/core/workloadmeta/fx-mock"
@@ -37,7 +37,7 @@ import (
 func TestFlareCreation(t *testing.T) {
 	realProvider := func(_ types.FlareBuilder) error { return nil }
 
-	fakeTagger := mock.SetupFakeTagger(t)
+	fakeTagger := mockTagger.SetupFakeTagger(t)
 
 	f := newFlare(
 		fxutil.Test[dependencies](
@@ -54,7 +54,7 @@ func TestFlareCreation(t *testing.T) {
 			autodiscoveryimpl.MockModule(),
 			fx.Supply(autodiscoveryimpl.MockParams{Scheduler: scheduler.NewController()}),
 			fx.Provide(func(ac autodiscovery.Mock) autodiscovery.Component { return ac.(autodiscovery.Component) }),
-			fx.Provide(func() tagger.Mock { return fakeTagger }),
+			fx.Provide(func() mockTagger.Mock { return fakeTagger }),
 			fx.Provide(func() tagger.Component { return fakeTagger }),
 			// provider a nil FlareCallback
 			fx.Provide(fx.Annotate(
@@ -78,7 +78,7 @@ func TestRunProviders(t *testing.T) {
 	var secondRan atomic.Bool
 	var secondDone atomic.Bool
 
-	fakeTagger := mock.SetupFakeTagger(t)
+	fakeTagger := mockTagger.SetupFakeTagger(t)
 
 	deps := fxutil.Test[dependencies](
 		t,
@@ -94,7 +94,7 @@ func TestRunProviders(t *testing.T) {
 		autodiscoveryimpl.MockModule(),
 		fx.Supply(autodiscoveryimpl.MockParams{Scheduler: scheduler.NewController()}),
 		fx.Provide(func(ac autodiscovery.Mock) autodiscovery.Component { return ac.(autodiscovery.Component) }),
-		fx.Provide(func() tagger.Mock { return fakeTagger }),
+		fx.Provide(func() mockTagger.Mock { return fakeTagger }),
 		fx.Provide(func() tagger.Component { return fakeTagger }),
 		// provider a nil FlareCallback
 		fx.Provide(fx.Annotate(

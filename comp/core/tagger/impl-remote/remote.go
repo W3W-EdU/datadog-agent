@@ -42,6 +42,7 @@ const (
 
 var errTaggerStreamNotStarted = errors.New("tagger stream not started")
 
+// Requires defines the dependencies for the remote tagger.
 type Requires struct {
 	compdef.In
 
@@ -52,6 +53,7 @@ type Requires struct {
 	Telemetry coretelemetry.Component
 }
 
+// Provides contains the fields provided by the remote tagger constructor.
 type Provides struct {
 	compdef.Out
 
@@ -99,7 +101,7 @@ func NewComponent(req Requires) (Provides, error) {
 
 // NewRemoteTagger creates a new remote tagger.
 // TODO: (components) remove once we pass the remote tagger instance to pkg/security/resolvers/tags/resolver.go
-func NewRemoteTagger(params tagger.RemoteParams, cfg config.Component, log log.Component, telemetryComp coretelemetry.Component) *remoteTagger {
+func NewRemoteTagger(params tagger.RemoteParams, cfg config.Component, log log.Component, telemetryComp coretelemetry.Component) tagger.Component {
 	telemetryStore := telemetry.NewStore(telemetryComp)
 
 	return &remoteTagger{

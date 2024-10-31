@@ -10,14 +10,20 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/fx"
 
+	"github.com/DataDog/datadog-agent/comp/core/config"
+	log "github.com/DataDog/datadog-agent/comp/core/log/def"
 	logmock "github.com/DataDog/datadog-agent/comp/core/log/mock"
-	taggerTelemetry "github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
+	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	noopTelemetry "github.com/DataDog/datadog-agent/comp/core/telemetry/noopsimpl"
+	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
+	workloadmetafxmock "github.com/DataDog/datadog-agent/comp/core/workloadmeta/fx-mock"
 	configmock "github.com/DataDog/datadog-agent/pkg/config/mock"
 	taggertypes "github.com/DataDog/datadog-agent/pkg/tagger/types"
 	"github.com/DataDog/datadog-agent/pkg/tagset"
+	"github.com/DataDog/datadog-agent/pkg/util/fxutil"
 )
 
 // TODO Improve test coverage with dogstatsd/enrich tests once Origin Detection is refactored.
@@ -37,9 +43,19 @@ func (f *fakeCIDProvider) ContainerIDForPodUIDAndContName(podUID, contName strin
 
 func TestEnrichTags(t *testing.T) {
 	// Create fake tagger
-	config := configmock.New(t)
-	telemetryStore := taggerTelemetry.NewStore(noopTelemetry.GetCompatComponent())
-	fakeTagger := NewFakeTagger(config, telemetryStore)
+	c := configmock.New(t)
+	params := tagger.Params{
+		UseFakeTagger: true,
+	}
+	logComponent := logmock.New(t)
+	wmeta := fxutil.Test[workloadmeta.Component](t,
+		fx.Provide(func() log.Component { return logComponent }),
+		fx.Provide(func() config.Component { return c }),
+		workloadmetafxmock.MockModule(workloadmeta.NewParams()),
+	)
+
+	tagger := NewTaggerClient(params, c, wmeta, logComponent, noopTelemetry.GetCompatComponent())
+	fakeTagger := tagger.defaultTagger.(*FakeTagger)
 
 	// Fill fake tagger with entities
 	fakeTagger.SetTags(types.NewEntityID(types.KubernetesPodUID, "pod"), "host", []string{"pod-low"}, []string{"pod-orch"}, []string{"pod-high"}, []string{"pod-std"})
@@ -84,7 +100,7 @@ func TestEnrichTags(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			tb := tagset.NewHashingTagsAccumulator()
-			fakeTagger.EnrichTags(tb, tt.originInfo)
+			tagger.EnrichTags(tb, tt.originInfo)
 			assert.Equal(t, tt.expectedTags, tb.Get())
 		})
 	}
@@ -92,27 +108,48 @@ func TestEnrichTags(t *testing.T) {
 
 func TestEnrichTagsOrchestrator(t *testing.T) {
 	// Create fake tagger
-	config := configmock.New(t)
-	telemetryStore := taggerTelemetry.NewStore(noopTelemetry.GetCompatComponent())
-	fakeTagger := NewFakeTagger(config, telemetryStore)
+	c := configmock.New(t)
+	params := tagger.Params{
+		UseFakeTagger: true,
+	}
+	logComponent := logmock.New(t)
+	wmeta := fxutil.Test[workloadmeta.Component](t,
+		fx.Provide(func() log.Component { return logComponent }),
+		fx.Provide(func() config.Component { return c }),
+		workloadmetafxmock.MockModule(workloadmeta.NewParams()),
+	)
+
+	tagger := NewTaggerClient(params, c, wmeta, logComponent, noopTelemetry.GetCompatComponent())
+
+	fakeTagger := tagger.defaultTagger.(*FakeTagger)
+
 	fakeTagger.SetTags(types.NewEntityID(types.ContainerID, "bar"), "fooSource", []string{"lowTag"}, []string{"orchTag"}, nil, nil)
 	tb := tagset.NewHashingTagsAccumulator()
-	fakeTagger.EnrichTags(tb, taggertypes.OriginInfo{ContainerIDFromSocket: "container_id://bar", Cardinality: "orchestrator"})
+	tagger.EnrichTags(tb, taggertypes.OriginInfo{ContainerIDFromSocket: "container_id://bar", Cardinality: "orchestrator"})
 	assert.Equal(t, []string{"lowTag", "orchTag"}, tb.Get())
 }
 
 func TestEnrichTagsOptOut(t *testing.T) {
 	// Create fake tagger
-	config := configmock.New(t)
-	config.SetWithoutSource("dogstatsd_origin_optout_enabled", true)
-	telemetryStore := taggerTelemetry.NewStore(noopTelemetry.GetCompatComponent())
-	fakeTagger := NewFakeTagger(config, telemetryStore)
+	c := configmock.New(t)
+	params := tagger.Params{
+		UseFakeTagger: true,
+	}
+	logComponent := logmock.New(t)
+	wmeta := fxutil.Test[workloadmeta.Component](t,
+		fx.Provide(func() log.Component { return logComponent }),
+		fx.Provide(func() config.Component { return c }),
+		workloadmetafxmock.MockModule(workloadmeta.NewParams()),
+	)
+
+	tagger := NewTaggerClient(params, c, wmeta, logComponent, noopTelemetry.GetCompatComponent())
+	fakeTagger := tagger.defaultTagger.(*FakeTagger)
 
 	fakeTagger.SetTags(types.NewEntityID(types.EntityIDPrefix("foo"), "bar"), "fooSource", []string{"lowTag"}, []string{"orchTag"}, nil, nil)
 	tb := tagset.NewHashingTagsAccumulator()
-	fakeTagger.EnrichTags(tb, taggertypes.OriginInfo{ContainerIDFromSocket: "foo://originID", PodUID: "pod-uid", ContainerID: "container-id", Cardinality: "none", ProductOrigin: taggertypes.ProductOriginDogStatsD})
+	tagger.EnrichTags(tb, taggertypes.OriginInfo{ContainerIDFromSocket: "foo://originID", PodUID: "pod-uid", ContainerID: "container-id", Cardinality: "none", ProductOrigin: taggertypes.ProductOriginDogStatsD})
 	assert.Equal(t, []string{}, tb.Get())
-	fakeTagger.EnrichTags(tb, taggertypes.OriginInfo{ContainerIDFromSocket: "foo://originID", ContainerID: "container-id", Cardinality: "none", ProductOrigin: taggertypes.ProductOriginDogStatsD})
+	tagger.EnrichTags(tb, taggertypes.OriginInfo{ContainerIDFromSocket: "foo://originID", ContainerID: "container-id", Cardinality: "none", ProductOrigin: taggertypes.ProductOriginDogStatsD})
 	assert.Equal(t, []string{}, tb.Get())
 }
 
@@ -176,7 +213,7 @@ func TestGenerateContainerIDFromExternalData(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			fakeTagger := taggerWrapper{}
+			fakeTagger := TaggerWrapper{}
 			containerID, err := fakeTagger.generateContainerIDFromExternalData(tt.externalData, tt.cidProvider)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, containerID)
@@ -185,7 +222,7 @@ func TestGenerateContainerIDFromExternalData(t *testing.T) {
 }
 
 func TestTaggerCardinality(t *testing.T) {
-	fakeTagger := taggerWrapper{}
+	fakeTagger := TaggerWrapper{}
 	tests := []struct {
 		name        string
 		cardinality string
