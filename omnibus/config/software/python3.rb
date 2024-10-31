@@ -32,7 +32,7 @@ elsif linux_target?
   python_configure_options.push("--enable-shared",
                         "--enable-ipv6")
 elsif windows_target?
-  python_configure_options.push("--host=i686-pc-windows-msvc")
+  python_configure_options.push("--host=x86_64-w64-mingw32")
 elsif aix?
   # something here...
 end
