@@ -46,6 +46,7 @@ build do
   # This removes the debug symbol generation and doesn't enable all warnings
   env["OPT"] = "-DNDEBUG -fwrapv"
   configure(*python_configure_options, :env => env)
+  command "make --version"
   command "make -j #{workers}", :env => env
   command "make install", :env => env
 
