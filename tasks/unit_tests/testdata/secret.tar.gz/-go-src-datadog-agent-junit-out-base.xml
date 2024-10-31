@@ -2089,7 +2089,7 @@
 			<property name="go.version" value="go1.21.9 linux/amd64" />
 		</properties>
 	</testsuite>
-	<testsuite tests="0" failures="0" time="0.000000" name=tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def" timestamp="2024-05-10T17:03:43Z">
+	<testsuite tests="0" failures="0" time="0.000000" name="github.com/DataDog/datadog-agent/comp/core/tagger" timestamp="2024-05-10T17:03:43Z">
 		<properties>
 			<property name="go.version" value="go1.21.9 linux/amd64" />
 		</properties>
@@ -2114,59 +2114,59 @@
 		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl" name="TestParseEntityID/not_found" time="0.000000" />
 		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl" name="TestParseEntityID" time="0.000000" />
 	</testsuite>
-	<testsuite tests="0" failures="0" time="0.000000" name="github.com/DataDog/datadog-agent/comp/core/tagger/api" timestamp="2024-05-10T17:03:43Z">
+	<testsuite tests="0" failures="0" time="0.000000" name="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/api" timestamp="2024-05-10T17:03:43Z">
 		<properties>
 			<property name="go.version" value="go1.21.9 linux/amd64" />
 		</properties>
 	</testsuite>
-	<testsuite tests="44" failures="0" time="1.363000" name="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" timestamp="2024-05-10T17:03:43Z">
+	<testsuite tests="44" failures="0" time="1.363000" name="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" timestamp="2024-05-10T17:03:43Z">
 		<properties>
 			<property name="go.version" value="go1.21.9 linux/amd64" />
 		</properties>
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestAddResourceTags/nominal_case" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestAddResourceTags/replace_colon_enabled,_replace_tag_key" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestAddResourceTags/replace_colon_enabled,_do_not_replace_tag_value" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestAddResourceTags/replace_colon_disabled" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestAddResourceTags" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleKubePod/fully_formed_pod_(no_containers)" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleKubePod/pod_with_fully_formed_container,_standard_tags_from_env" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleKubePod/pod_with_container,_standard_tags_from_labels" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleKubePod/pod_from_openshift_deployment" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleKubePod/pod_with_admission_+_remote_config_annotations" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleKubePod/static_tags" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleKubePod/disable_kube_service" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleKubePod" time="0.050000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleKubePodNoContainerName/pod_with_no_container_name" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleKubePodNoContainerName" time="0.030000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleECSTask/basic_ECS_EC2_task" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleECSTask/basic_ECS_Fargate_task" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleECSTask" time="0.030000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainer/fully_formed_container" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainer/tags_from_environment" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainer/tags_from_labels" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainer/tags_from_labels_and_envs_with_prefix_(using_*)" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainer/docker_container_with_image_that_has_no_tag" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainer/nomad_container" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainer/mesos_dc/os_container" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainer/rancher_container" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainer/docker_swarm_container" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainer/opencontainers_image_revision_and_source" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainer/static_tags" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainer" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainerImage/basic" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleContainerImage" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandleDelete" time="0.040000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestHandlePodWithDeletedContainer" time="0.030000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestParseJSONValue/empty_json" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestParseJSONValue/invalid_json" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestParseJSONValue/invalid_value" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestParseJSONValue/strings_and_arrays" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestParseJSONValue/arrays_only" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestParseJSONValue/strings_only" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="TestParseJSONValue" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="Test_mergeMaps/no_conflict" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="Test_mergeMaps/conflict" time="0.000000" />
-		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/collectors" name="Test_mergeMaps" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestAddResourceTags/nominal_case" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestAddResourceTags/replace_colon_enabled,_replace_tag_key" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestAddResourceTags/replace_colon_enabled,_do_not_replace_tag_value" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestAddResourceTags/replace_colon_disabled" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestAddResourceTags" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleKubePod/fully_formed_pod_(no_containers)" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleKubePod/pod_with_fully_formed_container,_standard_tags_from_env" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleKubePod/pod_with_container,_standard_tags_from_labels" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleKubePod/pod_from_openshift_deployment" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleKubePod/pod_with_admission_+_remote_config_annotations" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleKubePod/static_tags" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleKubePod/disable_kube_service" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleKubePod" time="0.050000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleKubePodNoContainerName/pod_with_no_container_name" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleKubePodNoContainerName" time="0.030000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleECSTask/basic_ECS_EC2_task" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleECSTask/basic_ECS_Fargate_task" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleECSTask" time="0.030000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainer/fully_formed_container" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainer/tags_from_environment" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainer/tags_from_labels" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainer/tags_from_labels_and_envs_with_prefix_(using_*)" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainer/docker_container_with_image_that_has_no_tag" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainer/nomad_container" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainer/mesos_dc/os_container" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainer/rancher_container" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainer/docker_swarm_container" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainer/opencontainers_image_revision_and_source" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainer/static_tags" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainer" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainerImage/basic" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleContainerImage" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandleDelete" time="0.040000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestHandlePodWithDeletedContainer" time="0.030000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestParseJSONValue/empty_json" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestParseJSONValue/invalid_json" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestParseJSONValue/invalid_value" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestParseJSONValue/strings_and_arrays" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestParseJSONValue/arrays_only" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestParseJSONValue/strings_only" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="TestParseJSONValue" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="Test_mergeMaps/no_conflict" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="Test_mergeMaps/conflict" time="0.000000" />
+		<testcase classname="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/collectors" name="Test_mergeMaps" time="0.000000" />
 	</testsuite>
 	<testsuite tests="0" failures="0" time="0.000000" name="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/empty" timestamp="2024-05-10T17:03:43Z">
 		<properties>
@@ -2192,7 +2192,7 @@
 			<property name="go.version" value="go1.21.9 linux/amd64" />
 		</properties>
 	</testsuite>
-	<testsuite tests="0" failures="0" time="0.000000" name="github.com/DataDog/datadog-agent/comp/core/tagger/server" timestamp="2024-05-10T17:03:43Z">
+	<testsuite tests="0" failures="0" time="0.000000" name="github.com/DataDog/datadog-agent/comp/core/tagger/taggerimpl/server" timestamp="2024-05-10T17:03:43Z">
 		<properties>
 			<property name="go.version" value="go1.21.9 linux/amd64" />
 		</properties>
