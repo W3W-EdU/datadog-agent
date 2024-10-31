@@ -31,6 +31,8 @@ if mac_os_x?
 elsif linux_target?
   python_configure_options.push("--enable-shared",
                         "--enable-ipv6")
+elsif windows_target?
+  python_configure_options.push("--host=i686-pc-windows-msvc")
 elsif aix?
   # something here...
 end
