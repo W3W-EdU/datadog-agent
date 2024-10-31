@@ -115,7 +115,7 @@ func Commands(globalParams *command.GlobalParams) []*cobra.Command {
 				}),
 				dualTaggerfx.Module(tagger.DualParams{
 					UseRemote: func(c config.Component) bool {
-						return c.GetBool("apm_config.remote_tagger")
+						return c.GetBool("security_agent.remote_tagger")
 					},
 				}, tagger.Params{}, tagger.RemoteParams{
 					RemoteTarget: func(c config.Component) (string, error) {

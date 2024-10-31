@@ -16,7 +16,6 @@ import (
 	"os"
 	"path"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -40,8 +39,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig"
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig/sysprobeconfigimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	dualTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-dual"
-	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
+	localTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
 	wmcatalog "github.com/DataDog/datadog-agent/comp/core/workloadmeta/collectors/catalog"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
 	workloadmetafx "github.com/DataDog/datadog-agent/comp/core/workloadmeta/fx"
@@ -51,11 +49,9 @@ import (
 	"github.com/DataDog/datadog-agent/comp/metadata/inventoryotel/inventoryotelimpl"
 	"github.com/DataDog/datadog-agent/comp/metadata/resources/resourcesimpl"
 	"github.com/DataDog/datadog-agent/comp/serializer/compression/compressionimpl"
-	"github.com/DataDog/datadog-agent/pkg/api/security"
 	"github.com/DataDog/datadog-agent/pkg/api/util"
 	"github.com/DataDog/datadog-agent/pkg/config/settings"
 	pkgconfigsetup "github.com/DataDog/datadog-agent/pkg/config/setup"
-	"github.com/DataDog/datadog-agent/pkg/config/utils"
 	procnet "github.com/DataDog/datadog-agent/pkg/process/net"
 	"github.com/DataDog/datadog-agent/pkg/serializer"
 	"github.com/DataDog/datadog-agent/pkg/util/defaultpaths"
@@ -129,25 +125,7 @@ func Commands(globalParams *command.GlobalParams) []*cobra.Command {
 					AgentType:  workloadmeta.NodeAgent,
 					InitHelper: common.GetWorkloadmetaInit(),
 				}),
-				dualTaggerfx.Module(tagger.DualParams{
-					UseRemote: func(c config.Component) bool {
-						return pkgconfigsetup.IsCLCRunner(c) && c.GetBool("clc_runner_remote_tagger_enabled")
-					},
-				}, tagger.Params{}, tagger.RemoteParams{
-					RemoteTarget: func(config.Component) (string, error) {
-						target, err := utils.GetClusterAgentEndpoint()
-						if err != nil {
-							return "", err
-						}
-						return strings.TrimPrefix(target, "https://"), nil
-					},
-					RemoteTokenFetcher: func(c config.Component) func() (string, error) {
-						return func() (string, error) {
-							return security.GetClusterAgentAuthToken(c)
-						}
-					},
-					RemoteFilter: taggerTypes.NewFilterBuilder().Exclude(taggerTypes.KubernetesPodUID).Build(taggerTypes.HighCardinality),
-				}),
+				localTaggerfx.Module(tagger.Params{}),
 				autodiscoveryimpl.Module(),
 				fx.Supply(optional.NewNoneOption[collector.Component]()),
 				compressionimpl.Module(),
