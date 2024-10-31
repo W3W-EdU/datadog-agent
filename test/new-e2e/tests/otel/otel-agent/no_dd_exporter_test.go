@@ -25,6 +25,12 @@ type noDDExporterTestSuite struct {
 //go:embed config/no-dd-exporter.yml
 var noDDExporterConfig string
 
+//go:embed testdata/no-dd-exporter-provided-config.yml
+var noDDExporterProvidedConfig string
+
+//go:embed testdata/no-dd-exporter-full-config.yml
+var noDDExporterFullConfig string
+
 func TestOTelAgentWithNoDDExporter(t *testing.T) {
 	values := `
 datadog:
@@ -49,5 +55,5 @@ func (s *noDDExporterTestSuite) TestOTelAgentInstalled() {
 }
 
 func (s *noDDExporterTestSuite) TestFlare() {
-	utils.TestOTelFlare(s, "", "", "")
+	utils.TestOTelFlare(s, noDDExporterProvidedConfig, noDDExporterFullConfig, sources)
 }
