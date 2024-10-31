@@ -6,17 +6,22 @@
 package tagger
 
 import (
+	"github.com/DataDog/datadog-agent/comp/core/config"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 )
 
 // RemoteParams provides remote tagger parameters
 type RemoteParams struct {
 	RemoteFilter       *types.Filter
-	RemoteTarget       string
-	RemoteTokenFetcher func() (string, error)
+	RemoteTarget       func() (string, error)
+	RemoteTokenFetcher func(config.Component) func() (string, error)
 }
 
 // Params provides local tagger parameters
 type Params struct {
 	UseFakeTagger bool
+}
+
+type DualParams struct {
+	UseRemote func(config.Component) bool
 }

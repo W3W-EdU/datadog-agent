@@ -75,8 +75,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig"
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig/sysprobeconfigimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	taggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
-	remoteTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-remote"
+	dualTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/dual-fx"
 	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry"
 	wmcatalog "github.com/DataDog/datadog-agent/comp/core/workloadmeta/collectors/catalog-core"
@@ -138,6 +137,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/config/remote/data"
 	commonsettings "github.com/DataDog/datadog-agent/pkg/config/settings"
 	pkgconfigsetup "github.com/DataDog/datadog-agent/pkg/config/setup"
+	"github.com/DataDog/datadog-agent/pkg/config/utils"
 	"github.com/DataDog/datadog-agent/pkg/jmxfetch"
 	proccontainers "github.com/DataDog/datadog-agent/pkg/process/util/containers"
 	"github.com/DataDog/datadog-agent/pkg/serializer"
@@ -149,7 +149,6 @@ import (
 	systemprobeStatus "github.com/DataDog/datadog-agent/pkg/status/systemprobe"
 	pkgTelemetry "github.com/DataDog/datadog-agent/pkg/telemetry"
 	"github.com/DataDog/datadog-agent/pkg/util"
-	"github.com/DataDog/datadog-agent/pkg/util/clusteragent"
 	pkgcommon "github.com/DataDog/datadog-agent/pkg/util/common"
 	"github.com/DataDog/datadog-agent/pkg/util/defaultpaths"
 	"github.com/DataDog/datadog-agent/pkg/util/flavor"
@@ -398,29 +397,24 @@ func getSharedFxOption() fx.Option {
 		rcserviceimpl.Module(),
 		rcservicemrfimpl.Module(),
 		remoteconfig.Bundle(),
-		fx.Supply(func(c config.Component) fx.Option {
-			if pkgconfigsetup.IsCLCRunner(c) {
-				if c.GetBool("clc_runner_remote_tagger_enabled") {
-					target, err := clusteragent.GetClusterAgentEndpoint()
-					if err != nil {
-						return taggerfx.Module(tagger.Params{
-							UseFakeTagger: true,
-						})
-					}
-
-					// gRPC targets do not have a protocol. the DCA endpoint is always HTTPS,
-					// so a simple `TrimPrefix` is enough.
-					return remoteTaggerfx.Module(tagger.RemoteParams{
-						RemoteTarget:       strings.TrimPrefix(target, "https://"),
-						RemoteTokenFetcher: func() (string, error) { return security.GetClusterAgentAuthToken(c) },
-						RemoteFilter:       taggerTypes.NewFilterBuilder().Exclude(taggerTypes.KubernetesPodUID).Build(taggerTypes.HighCardinality),
-					})
+		dualTaggerfx.Module(tagger.DualParams{
+			UseRemote: func(c config.Component) bool {
+				return pkgconfigsetup.IsCLCRunner(c) && c.GetBool("clc_runner_remote_tagger_enabled")
+			},
+		}, tagger.Params{}, tagger.RemoteParams{
+			RemoteTarget: func() (string, error) {
+				target, err := utils.GetClusterAgentEndpoint()
+				if err != nil {
+					return "", err
 				}
-				return taggerfx.Module(tagger.Params{
-					UseFakeTagger: true,
-				})
-			}
-			return taggerfx.Module(tagger.Params{})
+				return strings.TrimPrefix(target, "https://"), nil
+			},
+			RemoteTokenFetcher: func(c config.Component) func() (string, error) {
+				return func() (string, error) {
+					return security.GetClusterAgentAuthToken(c)
+				}
+			},
+			RemoteFilter: taggerTypes.NewFilterBuilder().Exclude(taggerTypes.KubernetesPodUID).Build(taggerTypes.HighCardinality),
 		}),
 		autodiscoveryimpl.Module(),
 		// InitSharedContainerProvider must be called before the application starts so the workloadmeta collector can be initiailized correctly.

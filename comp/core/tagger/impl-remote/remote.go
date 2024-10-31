@@ -92,7 +92,11 @@ type Options struct {
 
 // NewComponent returns a remote tagger
 func NewComponent(req Requires) (Provides, error) {
-	remoteTagger := NewRemoteTagger(req.Params, req.Config, req.Log, req.Telemetry)
+	remoteTagger, err := NewRemoteTagger(req.Params, req.Config, req.Log, req.Telemetry)
+
+	if err != nil {
+		return Provides{}, err
+	}
 
 	return Provides{
 		Comp: remoteTagger,
@@ -101,20 +105,25 @@ func NewComponent(req Requires) (Provides, error) {
 
 // NewRemoteTagger creates a new remote tagger.
 // TODO: (components) remove once we pass the remote tagger instance to pkg/security/resolvers/tags/resolver.go
-func NewRemoteTagger(params tagger.RemoteParams, cfg config.Component, log log.Component, telemetryComp coretelemetry.Component) tagger.Component {
+func NewRemoteTagger(params tagger.RemoteParams, cfg config.Component, log log.Component, telemetryComp coretelemetry.Component) (tagger.Component, error) {
 	telemetryStore := telemetry.NewStore(telemetryComp)
+
+	target, err := params.RemoteTarget()
+	if err != nil {
+		return nil, err
+	}
 
 	return &remoteTagger{
 		options: Options{
-			Target:       params.RemoteTarget,
-			TokenFetcher: params.RemoteTokenFetcher,
+			Target:       target,
+			TokenFetcher: params.RemoteTokenFetcher(cfg),
 		},
 		cfg:            cfg,
 		store:          newTagStore(cfg, telemetryStore),
 		telemetryStore: telemetryStore,
 		filter:         params.RemoteFilter,
 		log:            log,
-	}
+	}, nil
 }
 
 // Start creates the connection to the remote tagger and starts watching for
