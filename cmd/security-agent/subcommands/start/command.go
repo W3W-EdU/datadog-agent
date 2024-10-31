@@ -45,8 +45,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig"
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig/sysprobeconfigimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	localTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
-	remoteTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-remote"
+	dualTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-dual"
 	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry"
 	wmcatalog "github.com/DataDog/datadog-agent/comp/core/workloadmeta/collectors/catalog"
@@ -114,15 +113,20 @@ func Commands(globalParams *command.GlobalParams) []*cobra.Command {
 						AgentType: catalog,
 					}
 				}),
-				fx.Provide(func(config config.Component) fx.Option {
-					if config.GetBool("security_agent.remote_tagger") {
-						return remoteTaggerFx.Module(tagger.RemoteParams{
-							RemoteTarget:       fmt.Sprintf(":%v", config.GetInt("cmd_port")),
-							RemoteTokenFetcher: func() (string, error) { return security.FetchAuthToken(config) },
-							RemoteFilter:       taggerTypes.NewMatchAllFilter(),
-						})
-					}
-					return localTaggerFx.Module(tagger.Params{})
+				dualTaggerfx.Module(tagger.DualParams{
+					UseRemote: func(c config.Component) bool {
+						return c.GetBool("apm_config.remote_tagger")
+					},
+				}, tagger.Params{}, tagger.RemoteParams{
+					RemoteTarget: func(c config.Component) (string, error) {
+						return fmt.Sprintf(":%v", c.GetInt("cmd_port")), nil
+					},
+					RemoteTokenFetcher: func(c config.Component) func() (string, error) {
+						return func() (string, error) {
+							return security.FetchAuthToken(c)
+						}
+					},
+					RemoteFilter: taggerTypes.NewMatchAllFilter(),
 				}),
 				fx.Provide(func() startstop.Stopper {
 					return startstop.NewSerialStopper()

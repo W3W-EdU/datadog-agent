@@ -108,7 +108,7 @@ func NewComponent(req Requires) (Provides, error) {
 func NewRemoteTagger(params tagger.RemoteParams, cfg config.Component, log log.Component, telemetryComp coretelemetry.Component) (tagger.Component, error) {
 	telemetryStore := telemetry.NewStore(telemetryComp)
 
-	target, err := params.RemoteTarget()
+	target, err := params.RemoteTarget(cfg)
 	if err != nil {
 		return nil, err
 	}

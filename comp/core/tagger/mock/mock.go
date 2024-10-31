@@ -73,8 +73,8 @@ func New(t testing.TB) Mock {
 	}
 }
 
-// MockProvides is a struct containing the mock and the endpoint
-type MockProvides struct {
+// Provides is a struct containing the mock and the endpoint
+type Provides struct {
 	fx.Out
 
 	Comp     Mock
@@ -90,8 +90,8 @@ type dependencies struct {
 	Telemetry telemetry.Component
 }
 
-// NewMock returns a mockProvides
-func NewMock(deps dependencies) MockProvides {
+// NewMock returns a Provides
+func NewMock(deps dependencies) Provides {
 	params := tagger.Params{
 		UseFakeTagger: true,
 	}
@@ -101,14 +101,14 @@ func NewMock(deps dependencies) MockProvides {
 	c := &mockTaggerClient{
 		tagger,
 	}
-	return MockProvides{
+	return Provides{
 		Comp:     c,
 		Endpoint: api.NewAgentEndpointProvider(c.mockHandleRequest, "/tagger-list", "GET"),
 	}
 }
 
-// MockModule is a module containing the mock, useful for testing
-func MockModule() fxutil.Module {
+// Module is a module containing the mock, useful for testing
+func Module() fxutil.Module {
 	return fxutil.Component(
 		fx.Provide(NewMock),
 		fx.Supply(config.Params{}),
@@ -123,7 +123,7 @@ func MockModule() fxutil.Module {
 
 // SetupFakeTagger calls fxutil.Test to create a mock tagger for testing
 func SetupFakeTagger(t testing.TB) Mock {
-	return fxutil.Test[Mock](t, MockModule())
+	return fxutil.Test[Mock](t, Module())
 }
 
 // SetTags calls faketagger SetTags which sets the tags for an entity

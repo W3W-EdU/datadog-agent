@@ -27,8 +27,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/secrets"
 	"github.com/DataDog/datadog-agent/comp/core/secrets/secretsimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	localTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
-	remoteTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-remote"
+	dualTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-dual"
 	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry/telemetryimpl"
 	wmcatalog "github.com/DataDog/datadog-agent/comp/core/workloadmeta/collectors/catalog"
@@ -102,15 +101,20 @@ func runTraceAgentProcess(ctx context.Context, cliParams *Params, defaultConfPat
 		}),
 		autoexitimpl.Module(),
 		statsd.Module(),
-		fx.Provide(func(coreConfig coreconfig.Component) fx.Option {
-			if coreConfig.GetBool("apm_config.remote_tagger") {
-				return remoteTaggerFx.Module(tagger.RemoteParams{
-					RemoteTarget:       fmt.Sprintf(":%v", coreConfig.GetInt("cmd_port")),
-					RemoteTokenFetcher: func() (string, error) { return security.FetchAuthToken(coreConfig) },
-					RemoteFilter:       taggerTypes.NewMatchAllFilter(),
-				})
-			}
-			return localTaggerFx.Module(tagger.Params{})
+		dualTaggerfx.Module(tagger.DualParams{
+			UseRemote: func(c coreconfig.Component) bool {
+				return c.GetBool("apm_config.remote_tagger")
+			},
+		}, tagger.Params{}, tagger.RemoteParams{
+			RemoteTarget: func(c coreconfig.Component) (string, error) {
+				return fmt.Sprintf(":%v", c.GetInt("cmd_port")), nil
+			},
+			RemoteTokenFetcher: func(c coreconfig.Component) func() (string, error) {
+				return func() (string, error) {
+					return security.FetchAuthToken(c)
+				}
+			},
+			RemoteFilter: taggerTypes.NewMatchAllFilter(),
 		}),
 		fx.Invoke(func(_ config.Component) {}),
 		// Required to avoid cyclic imports.

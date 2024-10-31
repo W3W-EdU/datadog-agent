@@ -44,8 +44,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/settings/settingsimpl"
 	"github.com/DataDog/datadog-agent/comp/core/status"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	taggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
-	remoteTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-remote"
+	dualTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-dual"
 	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	wmcatalog "github.com/DataDog/datadog-agent/comp/core/workloadmeta/collectors/catalog"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
@@ -62,8 +61,8 @@ import (
 	pkgcollector "github.com/DataDog/datadog-agent/pkg/collector"
 	"github.com/DataDog/datadog-agent/pkg/config/model"
 	pkgconfigsetup "github.com/DataDog/datadog-agent/pkg/config/setup"
+	"github.com/DataDog/datadog-agent/pkg/config/utils"
 	proccontainers "github.com/DataDog/datadog-agent/pkg/process/util/containers"
-	"github.com/DataDog/datadog-agent/pkg/util/clusteragent"
 	"github.com/DataDog/datadog-agent/pkg/util/defaultpaths"
 	"github.com/DataDog/datadog-agent/pkg/util/fxutil"
 	"github.com/DataDog/datadog-agent/pkg/util/optional"
@@ -160,29 +159,24 @@ func Commands(globalParams *command.GlobalParams) []*cobra.Command {
 			fx.Provide(func() pidmap.Component { return nil }),
 			fx.Provide(func() replay.Component { return nil }),
 			fx.Provide(func() status.Component { return nil }),
-			fx.Supply(func(c config.Component) fx.Option {
-				if pkgconfigsetup.IsCLCRunner(c) {
-					if c.GetBool("clc_runner_remote_tagger_enabled") {
-						target, err := clusteragent.GetClusterAgentEndpoint()
-						if err != nil {
-							return taggerfx.Module(tagger.Params{
-								UseFakeTagger: true,
-							})
-						}
-
-						// gRPC targets do not have a protocol. the DCA endpoint is always HTTPS,
-						// so a simple `TrimPrefix` is enough.
-						return remoteTaggerfx.Module(tagger.RemoteParams{
-							RemoteTarget:       strings.TrimPrefix(target, "https://"),
-							RemoteTokenFetcher: func() (string, error) { return security.GetClusterAgentAuthToken(c) },
-							RemoteFilter:       taggerTypes.NewFilterBuilder().Exclude(taggerTypes.KubernetesPodUID).Build(taggerTypes.HighCardinality),
-						})
+			dualTaggerfx.Module(tagger.DualParams{
+				UseRemote: func(c config.Component) bool {
+					return pkgconfigsetup.IsCLCRunner(c) && c.GetBool("clc_runner_remote_tagger_enabled")
+				},
+			}, tagger.Params{}, tagger.RemoteParams{
+				RemoteTarget: func(config.Component) (string, error) {
+					target, err := utils.GetClusterAgentEndpoint()
+					if err != nil {
+						return "", err
 					}
-					return taggerfx.Module(tagger.Params{
-						UseFakeTagger: true,
-					})
-				}
-				return taggerfx.Module(tagger.Params{})
+					return strings.TrimPrefix(target, "https://"), nil
+				},
+				RemoteTokenFetcher: func(c config.Component) func() (string, error) {
+					return func() (string, error) {
+						return security.GetClusterAgentAuthToken(c)
+					}
+				},
+				RemoteFilter: taggerTypes.NewFilterBuilder().Exclude(taggerTypes.KubernetesPodUID).Build(taggerTypes.HighCardinality),
 			}),
 			autodiscoveryimpl.Module(),
 			agent.Bundle(jmxloggerimpl.NewCliParams(cliParams.logFile)),

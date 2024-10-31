@@ -27,9 +27,8 @@ import (
 	log "github.com/DataDog/datadog-agent/comp/core/log/def"
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	localTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
-	remoteTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-remote"
-	taggertypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
+	dualTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-dual"
+	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	wmcatalog "github.com/DataDog/datadog-agent/comp/core/workloadmeta/collectors/catalog"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
 	workloadmetafx "github.com/DataDog/datadog-agent/comp/core/workloadmeta/fx"
@@ -144,15 +143,20 @@ func MakeCommand(globalParamsGetter func() *command.GlobalParams, name string, a
 				}),
 
 				// Tagger must be initialized after agent config has been setup
-				fx.Provide(func(c config.Component) fx.Option {
-					if c.GetBool("process_config.remote_tagger") {
-						return remoteTaggerfx.Module(tagger.RemoteParams{
-							RemoteTarget:       fmt.Sprintf(":%v", c.GetInt("cmd_port")),
-							RemoteTokenFetcher: func() (string, error) { return security.FetchAuthToken(c) },
-							RemoteFilter:       taggertypes.NewMatchAllFilter(),
-						})
-					}
-					return localTaggerfx.Module(tagger.Params{})
+				dualTaggerfx.Module(tagger.DualParams{
+					UseRemote: func(c config.Component) bool {
+						return c.GetBool("apm_config.remote_tagger")
+					},
+				}, tagger.Params{}, tagger.RemoteParams{
+					RemoteTarget: func(c config.Component) (string, error) {
+						return fmt.Sprintf(":%v", c.GetInt("cmd_port")), nil
+					},
+					RemoteTokenFetcher: func(c config.Component) func() (string, error) {
+						return func() (string, error) {
+							return security.FetchAuthToken(c)
+						}
+					},
+					RemoteFilter: taggerTypes.NewMatchAllFilter(),
 				}),
 				processComponent.Bundle(),
 				// InitSharedContainerProvider must be called before the application starts so the workloadmeta collector can be initiailized correctly.

@@ -32,8 +32,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig"
 	"github.com/DataDog/datadog-agent/comp/core/sysprobeconfig/sysprobeconfigimpl"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
-	localTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx"
-	remoteTaggerFx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-remote"
+	dualTaggerfx "github.com/DataDog/datadog-agent/comp/core/tagger/fx-dual"
 	taggerTypes "github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	wmcatalog "github.com/DataDog/datadog-agent/comp/core/workloadmeta/collectors/catalog"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
@@ -174,19 +173,23 @@ func runApp(ctx context.Context, globalParams *GlobalParams) error {
 			return workloadmeta.Params{AgentType: catalog}
 		}),
 
-		// Provide the corresponding tagger
-		fx.Provide(func(c config.Component) fx.Option {
-			if c.GetBool("process_config.remote_tagger") ||
-				// If the agent is running in ECS or ECS Fargate and the ECS task collection is enabled, use the remote tagger
-				// as remote tagger can return more tags than the local tagger.
-				((env.IsECS() || env.IsECSFargate()) && c.GetBool("ecs_task_collection_enabled")) {
-				return remoteTaggerFx.Module(tagger.RemoteParams{
-					RemoteTarget:       fmt.Sprintf(":%v", c.GetInt("cmd_port")),
-					RemoteTokenFetcher: func() (string, error) { return security.FetchAuthToken(c) },
-					RemoteFilter:       taggerTypes.NewMatchAllFilter(),
-				})
-			}
-			return localTaggerFx.Module(tagger.Params{})
+		dualTaggerfx.Module(tagger.DualParams{
+			UseRemote: func(c config.Component) bool {
+				return c.GetBool("process_config.remote_tagger") ||
+					// If the agent is running in ECS or ECS Fargate and the ECS task collection is enabled, use the remote tagger
+					// as remote tagger can return more tags than the local tagger.
+					((env.IsECS() || env.IsECSFargate()) && c.GetBool("ecs_task_collection_enabled"))
+			},
+		}, tagger.Params{}, tagger.RemoteParams{
+			RemoteTarget: func(c config.Component) (string, error) {
+				return fmt.Sprintf(":%v", c.GetInt("cmd_port")), nil
+			},
+			RemoteTokenFetcher: func(c config.Component) func() (string, error) {
+				return func() (string, error) {
+					return security.FetchAuthToken(c)
+				}
+			},
+			RemoteFilter: taggerTypes.NewMatchAllFilter(),
 		}),
 
 		// Provides specific features to our own fx wrapper (logging, lifecycle, shutdowner)

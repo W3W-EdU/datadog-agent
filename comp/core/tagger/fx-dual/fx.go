@@ -3,7 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2024-present Datadog, Inc.
 
-// Package fx provides the fx module for the tagger component
+// Package fx provides the fx module for the dual tagger component
 package fx
 
 import (
@@ -15,7 +15,7 @@ import (
 )
 
 // Module defines the fx options for this component
-func Module(localParams tagger.Params, remoteParams tagger.RemoteParams, dualParams tagger.DualParams) fxutil.Module {
+func Module(dualParams tagger.DualParams, localParams tagger.Params, remoteParams tagger.RemoteParams) fxutil.Module {
 	return fxutil.Component(
 		fxutil.ProvideComponentConstructor(
 			dualimpl.NewComponent,

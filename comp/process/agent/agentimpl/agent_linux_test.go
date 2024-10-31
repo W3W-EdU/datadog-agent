@@ -127,7 +127,7 @@ func TestProcessAgentComponentOnLinux(t *testing.T) {
 				runnerimpl.Module(),
 				hostinfoimpl.MockModule(),
 				submitterimpl.MockModule(),
-				taggerMock.MockModule(),
+				taggerMock.Module(),
 				statsd.MockModule(),
 				Module(),
 
@@ -190,7 +190,7 @@ func TestStatusProvider(t *testing.T) {
 				runnerimpl.Module(),
 				hostinfoimpl.MockModule(),
 				submitterimpl.MockModule(),
-				taggerMock.MockModule(),
+				taggerMock.Module(),
 				statsd.MockModule(),
 				Module(),
 				fx.Replace(configComp.MockParams{Overrides: map[string]interface{}{
@@ -234,7 +234,7 @@ func TestTelemetryCoreAgent(t *testing.T) {
 		runnerimpl.Module(),
 		hostinfoimpl.MockModule(),
 		submitterimpl.MockModule(),
-		taggerMock.MockModule(),
+		taggerMock.Module(),
 		statsd.MockModule(),
 		Module(),
 		fx.Replace(configComp.MockParams{Overrides: map[string]interface{}{

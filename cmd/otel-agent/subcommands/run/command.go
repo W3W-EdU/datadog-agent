@@ -186,12 +186,12 @@ func runOTelAgentCommand(ctx context.Context, params *subcommands.GlobalParams, 
 			return configsyncimpl.NewParams(params.SyncTimeout, params.SyncDelay, true)
 		}),
 
-		fx.Provide(func(c coreconfig.Component) fx.Option {
-			return remoteTaggerFx.Module(tagger.RemoteParams{
-				RemoteTarget:       fmt.Sprintf(":%v", c.GetInt("cmd_port")),
-				RemoteTokenFetcher: func() (string, error) { return security.FetchAuthToken(c) },
-				RemoteFilter:       taggerTypes.NewMatchAllFilter(),
-			})
+		remoteTaggerFx.Module(tagger.RemoteParams{
+			RemoteTarget: func(c coreconfig.Component) (string, error) { return fmt.Sprintf(":%v", c.GetInt("cmd_port")), nil },
+			RemoteTokenFetcher: func(c coreconfig.Component) func() (string, error) {
+				return func() (string, error) { return security.FetchAuthToken(c) }
+			},
+			RemoteFilter: taggerTypes.NewMatchAllFilter(),
 		}),
 		telemetryimpl.Module(),
 		fx.Provide(func(cfg traceconfig.Component) telemetry.TelemetryCollector {

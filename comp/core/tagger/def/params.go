@@ -13,7 +13,7 @@ import (
 // RemoteParams provides remote tagger parameters
 type RemoteParams struct {
 	RemoteFilter       *types.Filter
-	RemoteTarget       func() (string, error)
+	RemoteTarget       func(config.Component) (string, error)
 	RemoteTokenFetcher func(config.Component) func() (string, error)
 }
 
@@ -22,6 +22,7 @@ type Params struct {
 	UseFakeTagger bool
 }
 
+// DualParams provides dual tagger parameters
 type DualParams struct {
 	UseRemote func(config.Component) bool
 }
