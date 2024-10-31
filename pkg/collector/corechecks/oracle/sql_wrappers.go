@@ -8,6 +8,8 @@
 package oracle
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -24,7 +26,9 @@ func selectWrapper[T any](c *Check, s T, sql string, binds ...interface{}) error
 			return err
 		}
 	}
-	err := c.db.Select(s, sql, binds...)
+	ctx, cancel := context.WithTimeout(context.Background(), DB_TIMEOUT_DURATION)
+	defer cancel()
+	err := c.db.SelectContext(ctx, s, sql, binds...)
 	err = handleError(c, &c.db, err)
 	if err != nil {
 		err = fmt.Errorf("%w %s", err, sql)
@@ -39,12 +43,20 @@ func getWrapper[T any](c *Check, s T, sql string, binds ...interface{}) error {
 			return err
 		}
 	}
-	err := c.db.Get(s, sql, binds...)
+	ctx, cancel := context.WithTimeout(context.Background(), DB_TIMEOUT_DURATION)
+	defer cancel()
+	err := c.db.GetContext(ctx, s, sql, binds...)
 	err = handleError(c, &c.db, err)
 	if err != nil {
 		err = fmt.Errorf("%w %s", err, sql)
 	}
 	return err
+}
+
+func execWrapper(db *sqlx.DB, sql string, args ...any) (sql.Result, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), DB_TIMEOUT_DURATION)
+	defer cancel()
+	return db.ExecContext(ctx, sql, args...)
 }
 
 func handleError(c *Check, db **sqlx.DB, err error) error {
